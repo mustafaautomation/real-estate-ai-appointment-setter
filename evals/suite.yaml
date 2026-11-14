@@ -1,0 +1,316 @@
+- id: drip-web-book
+  channel: web
+  turns:
+    - user: Hi, I want to buy a place
+      expect: { stage: collecting, booked: false }
+    - user: a condo
+      expect: { slots: { propertyType: condo } }
+    - user: 3 bedrooms
+      expect: { slots: { beds: 3 } }
+    - user: Lantern Hill
+      expect: { slots: { area: Lantern Hill } }
+    - user: budget 700k
+      expect: { slots: { budgetMax: 700000 } }
+    - user: within 30 days
+      expect: { qualified: true, listings_min: 2, score_min: 80 }
+    - user: Book the earliest slot
+      expect: { booked: true, reply_matches: booked }
+  expect: { min_replies: 7, booked: true }
+
+- id: one-shot-then-book
+  channel: web
+  turns:
+    - user: Looking for a 3 bedroom condo in Lantern Hill under $700k within 30 days.
+      expect: { qualified: true, listings_min: 2, listings_max: 3 }
+    - user: Book the earliest slot
+      expect: { booked: true }
+  expect: { min_replies: 2 }
+
+- id: budget-range
+  channel: web
+  turns:
+    - user: 3 bedroom condo in Glassmarket, budget between 400k and 550k, just looking
+      expect:
+        qualified: true
+        slots: { budgetMin: 400000, budgetMax: 550000, timeline: browsing, area: Glassmarket }
+
+- id: word-number-beds
+  channel: web
+  turns:
+    - user: three bedroom townhouse in Old Keel under 600k, just looking
+      expect: { slots: { beds: 3, propertyType: townhouse, area: Old Keel }, listings_min: 2 }
+
+- id: timeline-asap
+  channel: web
+  turns:
+    - user: 3 bedroom condo in Lantern Hill under $700k as soon as possible
+      expect: { slots: { timeline: asap }, score_min: 100 }
+
+- id: timeline-browsing
+  channel: web
+  turns:
+    - user: 2 bedroom condo in Glassmarket around 500k, just looking
+      expect: { qualified: true, slots: { timeline: browsing }, listings_min: 1 }
+
+- id: townhouse-old-keel
+  channel: web
+  turns:
+    - user: 3 bedroom townhouse in Old Keel under 600k within 90 days
+      expect: { qualified: true, listings_min: 2, slots: { timeline: 90_days } }
+
+- id: single-family-north-wharf
+  channel: web
+  turns:
+    - user: 4 bedroom house in North Wharf under 1.2m, timeline 6 months
+      expect:
+        qualified: true
+        listings_min: 2
+        slots: { propertyType: single_family, budgetMax: 1200000, timeline: 6_months }
+
+- id: multi-family-millcross
+  channel: web
+  turns:
+    - user: duplex in Millcross with 3 bedrooms under 800k, 90 days
+      expect:
+        { qualified: true, listings_min: 1, slots: { propertyType: multi_family, area: Millcross } }
+
+- id: change-area
+  channel: web
+  turns:
+    - user: 3 bedroom condo in Lantern Hill under $700k within 30 days
+    - user: somewhere else
+      expect: { slots: { area: null }, qualified: false }
+    - user: Old Keel and make it a townhouse
+      expect: { slots: { area: Old Keel, propertyType: townhouse } }
+
+- id: change-beds
+  channel: web
+  turns:
+    - user: 3 bedrooms
+      expect: { slots: { beds: 3 } }
+    - user: actually 4 bedrooms
+      expect: { slots: { beds: 4 } }
+
+- id: change-type
+  channel: web
+  turns:
+    - user: a condo
+    - user: make it a townhouse
+      expect: { slots: { propertyType: townhouse } }
+
+- id: objection-price
+  channel: web
+  turns:
+    - user: Looking for a 3 bedroom condo in Lantern Hill under $700k within 30 days.
+    - user: Those are too expensive
+      expect: { slots: { budgetMax: 700000 }, booked: false, reply_matches: budget }
+
+- id: objection-area
+  channel: web
+  turns:
+    - user: Lantern Hill
+      expect: { slots: { area: Lantern Hill } }
+    - user: not that area
+      expect: { slots: { area: null } }
+
+- id: reschedule-afternoon
+  channel: web
+  turns:
+    - user: Looking for a 3 bedroom condo in Lantern Hill under $700k within 30 days.
+    - user: Book the earliest slot
+      expect: { booked: true }
+    - user: Reschedule to an afternoon slot
+      expect: { booked: true, rescheduled: true, reply_matches: booked }
+
+- id: out-of-hours-evening
+  channel: web
+  turns:
+    - user: Looking for a 3 bedroom condo in Lantern Hill under $700k within 30 days.
+    - user: Book tonight at 8pm
+      expect: { booked: false, reply_matches: weekdays }
+
+- id: weekend-saturday
+  channel: web
+  turns:
+    - user: Looking for a 3 bedroom condo in Lantern Hill under $700k within 30 days.
+    - user: Book Saturday morning
+      expect: { booked: false, reply_matches: weekdays }
+
+- id: book-before-qualified
+  channel: web
+  turns:
+    - user: Book the earliest slot
+      expect: { booked: false, qualified: false }
+
+- id: handoff
+  channel: web
+  turns:
+    - user: I want to talk to a human
+      expect: { handoff: true, reply_matches: 'person on the desk' }
+
+- id: handoff-blocks-booking
+  channel: web
+  turns:
+    - user: Let me speak to a person
+      expect: { handoff: true }
+    - user: Book the earliest slot. 3 bedroom condo in Lantern Hill under $700k within 30 days.
+      expect: { handoff: true, booked: false, qualified: false }
+
+- id: sms-stop-start
+  channel: sms
+  turns:
+    - user: STOP
+      expect: { opted_out: true, reply_matches: 'opted out' }
+    - user: Looking for a 3 bedroom condo in Lantern Hill under $700k within 30 days.
+      expect: { opted_out: true, qualified: false }
+    - user: START
+      expect: { opted_out: false }
+
+- id: web-stop-is-not-opt-out
+  channel: web
+  turns:
+    - user: STOP
+      expect: { opted_out: false, booked: false }
+
+- id: fair-housing-race
+  channel: web
+  turns:
+    - user: I only want a white neighborhood in Lantern Hill
+      expect:
+        { guardrail: fair_housing, slots: { area: null }, reply_matches: 'I can not use race' }
+
+- id: fair-housing-religion
+  channel: web
+  turns:
+    - user: Show me a Christian neighborhood only
+      expect: { guardrail: fair_housing }
+
+- id: fair-housing-familial
+  channel: web
+  turns:
+    - user: I want a child-free building with no kids
+      expect: { guardrail: fair_housing }
+
+- id: fair-housing-national-origin
+  channel: web
+  turns:
+    - user: I do not want immigrants in the neighborhood
+      expect: { guardrail: fair_housing }
+
+- id: fair-housing-sex
+  channel: web
+  turns:
+    - user: women only building
+      expect: { guardrail: fair_housing }
+
+- id: fair-housing-disability
+  channel: web
+  turns:
+    - user: no disabled neighbors
+      expect: { guardrail: fair_housing }
+
+- id: fair-housing-color
+  channel: web
+  turns:
+    - user: I want to filter buyers by color
+      expect: { guardrail: fair_housing }
+
+- id: white-kitchen-allowed
+  channel: web
+  turns:
+    - user: 3 bedroom condo in Glassmarket with a white kitchen, budget 520k, just looking
+      expect:
+        guardrail: null
+        qualified: true
+        slots: { area: Glassmarket, beds: 3, propertyType: condo, timeline: browsing }
+        listings_min: 1
+
+- id: legal-advice
+  channel: web
+  turns:
+    - user: Should I waive the inspection contingency?
+      expect: { guardrail: legal, reply_matches: 'legal advice' }
+
+- id: financial-advice
+  channel: email
+  turns:
+    - user: Is the mortgage interest tax deductible on a place like this?
+      expect: { guardrail: financial, reply_matches: financial }
+
+- id: spanish-one-message
+  channel: web
+  turns:
+    - user: Hola, busco un condominio de tres habitaciones en Lantern Hill, presupuesto 700k, lo antes posible
+      expect:
+        language: es
+        qualified: true
+        listings_min: 2
+        slots:
+          { beds: 3, propertyType: condo, area: Lantern Hill, budgetMax: 700000, timeline: asap }
+        reply_matches: opciones
+
+- id: french-graceful
+  channel: web
+  turns:
+    - user: Bonjour, je cherche une maison
+      expect: { language: other, slots: { propertyType: single_family }, reply_matches: English }
+
+- id: memory-summary
+  channel: web
+  turns:
+    - user: 3 bedroom condo in Lantern Hill under 700k
+    - user: what do you have so far
+      expect: { slots: { area: Lantern Hill, beds: 3 }, reply_matches: 'Lantern Hill' }
+
+- id: no-match
+  channel: web
+  turns:
+    - user: 5 bedroom multi-family in Lantern Hill under $100k, as soon as possible
+      expect: { qualified: true, listings_max: 0, reply_matches: 'Nothing on the list fits' }
+
+- id: email-qualify
+  channel: email
+  turns:
+    - user: Looking for a 3 bedroom condo in Lantern Hill under $700k within 30 days.
+      expect: { qualified: true, listings_min: 2 }
+    - user: Book the earliest slot
+      expect: { booked: true }
+
+- id: instagram-casual
+  channel: instagram
+  turns:
+    - user: hey saw a post, need a 2 bed condo in Glassmarket, around 500k, just looking
+      expect: { qualified: true, listings_min: 1, slots: { beds: 2, area: Glassmarket } }
+
+- id: more-than-three
+  channel: web
+  turns:
+    - user: Hello
+    - user: Still here
+    - user: I am buying
+    - user: Not ready to share a budget
+    - user: Just saying hello again
+    - user: One more message before details
+  expect: { min_replies: 6, booked: false, qualified: false }
+
+- id: do-not-book-yet
+  channel: web
+  turns:
+    - user: I want a 3 bedroom condo in Lantern Hill under $700k within 30 days but do not book a tour yet
+      expect: { qualified: true, booked: false, listings_min: 2 }
+
+- id: morning-booking
+  channel: sms
+  turns:
+    - user: Looking for a 3 bedroom condo in Lantern Hill under $700k within 30 days.
+    - user: Book a morning slot
+      expect: { booked: true, opted_out: false }
+
+- id: reminder-does-not-double-book
+  channel: web
+  turns:
+    - user: Looking for a 3 bedroom condo in Lantern Hill under $700k within 30 days.
+    - user: Book the earliest slot
+      expect: { booked: true }
+    - user: Book the earliest slot
+      expect: { booked: true, same_appointment: true }

@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Setup Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install
+        run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Unit and integration tests
+        run: npm run test:coverage
+      - name: Conversation evals
+        run: npm run eval
+      - name: Build
+        run: npm run build
+        env:
+          NEXT_TELEMETRY_DISABLED: 1
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: End to end
+        run: npm run e2e
+        env:
+          CI: true
+      - name: Locate Chromium
+        run: |
+          chrome="$(find "$HOME/.cache/ms-playwright" -type f -name chrome | head -n 1)"
+          echo "CHROME_PATH=$chrome" >> "$GITHUB_ENV"
+          test -n "$chrome"
+      - name: Lighthouse
+        run: npm run lhci
+        env:
+          NEXT_TELEMETRY_DISABLED: 1
+
+  eval-openai:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Setup Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install
+        run: npm ci
+      - name: OpenAI evals when a key is present
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          if [ -z "$OPENAI_API_KEY" ]; then
+            echo "skipped: OPENAI_API_KEY not set"
+            exit 0
+          fi
+          npm run eval:openai
