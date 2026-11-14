@@ -10,6 +10,7 @@ import { MemoryCalendar } from '@/domain/booking/memory-calendar';
 import type { CalendarPort, LeadRepository } from '@/domain/types';
 
 import { brokerageTimeZone, calendarProvider, databasePath, storageDriver } from './config';
+import { seedDemo } from './seed';
 
 export type Container = {
   repo: LeadRepository;
@@ -19,6 +20,7 @@ export type Container = {
   timeZone: string;
   storage: 'memory' | 'sqlite';
   calendarName: 'memory' | 'calcom' | 'google';
+  ready: Promise<void>;
 };
 
 type GlobalState = typeof globalThis & { __harborline?: Container };
@@ -44,7 +46,7 @@ export function createContainer(): Container {
       : new MemoryRepository();
   const calendarName = calendarProvider();
   const calendar = createCalendar(calendarName, repo, timeZone);
-  return {
+  const container: Container = {
     repo,
     calendar,
     model: createReplyModel(),
@@ -52,7 +54,16 @@ export function createContainer(): Container {
     timeZone,
     storage,
     calendarName,
+    ready: Promise.resolve(),
   };
+  if (
+    process.env.NODE_ENV !== 'test' &&
+    process.env.SEED_DEMO !== '0' &&
+    calendarName === 'memory'
+  ) {
+    container.ready = seedDemo(container);
+  }
+  return container;
 }
 
 function createCalendar(

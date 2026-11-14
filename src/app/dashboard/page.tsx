@@ -1,110 +1,142 @@
-import { formatWhen } from '@/domain/booking/time';
-import { leadLabel } from '@/domain/mask';
-import { propertyLabel, timelineLabel } from '@/domain/qualification/slots';
-import type { Lead, PipelineStage, Slots } from '@/domain/types';
-import { PIPELINE_STAGES } from '@/domain/types';
+import { addCivilDays, formatWhen, zonedParts } from '@/domain/booking/time';
+import { propertyLabel } from '@/domain/qualification/slots';
+import type { Lead, Slots } from '@/domain/types';
+import { Inbox, type InboxCard, type Kpi, type WeekDay } from '@/components/inbox';
 import { getContainer } from '@/server/container';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Inbox' };
 
-const STAGE_LABEL: Record<PipelineStage, string> = {
-  new: 'New',
-  qualifying: 'Qualifying',
-  qualified: 'Qualified',
-  booked: 'Booked',
-  handoff: 'Handoff',
-  opted_out: 'Opted out',
-};
-
-export default function DashboardPage() {
+export default async function DashboardPage() {
   const container = getContainer();
+  await container.ready;
   const leads = container.repo.listLeads();
   const tours = container.repo
     .listAppointments()
     .filter((appointment) => appointment.status === 'booked');
+  const cards: InboxCard[] = leads.map((lead) => ({
+    id: lead.id,
+    synthetic: lead.externalUserId.startsWith('synthetic:'),
+    channel: lead.channel,
+    stage: lead.stage,
+    score: lead.score,
+    label: cardLabel(lead),
+    budget: budgetLabel(lead.slots),
+    area: lead.slots.area ?? '',
+    transcript: container.repo.listMessages(lead.conversationId).map((message) => ({
+      id: message.id,
+      role: message.role,
+      text: message.text,
+      createdAt: message.createdAt,
+    })),
+  }));
+  const week = buildWeek(container.timeZone, tours, leads);
+  const kpis = buildKpis(leads, tours, container.timeZone);
   return (
-    <main className="page dash">
-      <section>
-        <div className="section-label">
-          <h1>Inbox</h1>
-          <p>Leads in this process. Scores are computed from filled slots.</p>
-        </div>
-        {leads.length === 0 ? (
-          <p className="empty" data-testid="inbox-empty">
-            No leads in this process yet.
-          </p>
-        ) : (
-          <>
-            <div className="pipeline" aria-label="Pipeline counts">
-              {PIPELINE_STAGES.map((stage) => (
-                <section key={stage} className="column">
-                  <h2>{STAGE_LABEL[stage]}</h2>
-                  <p className="count">{leads.filter((lead) => lead.stage === stage).length}</p>
-                </section>
-              ))}
-            </div>
-            <div className="lead-list">
-              {leads.map((lead) => (
-                <LeadCard key={lead.id} lead={lead} timeZone={container.timeZone} />
-              ))}
-            </div>
-          </>
-        )}
-      </section>
-      <aside className="dash-side">
-        <article className="panel">
-          <h2>Tours</h2>
-          {tours.length === 0 ? (
-            <p className="empty" data-testid="tour-empty">
-              No tours booked in this process.
-            </p>
-          ) : (
-            <ul className="tours" data-testid="tour-list">
-              {tours.map((tour) => (
-                <li key={tour.id}>{formatWhen(tour.start, container.timeZone)}</li>
-              ))}
-            </ul>
-          )}
-        </article>
-      </aside>
+    <main className="page">
+      <div className="section-label">
+        <h1>Inbox</h1>
+        <p>
+          Synthetic seed plus anyone who writes in during this process. Scores come from filled
+          slots.
+        </p>
+      </div>
+      <Inbox leads={cards} week={week} kpis={kpis} />
     </main>
   );
 }
 
-function LeadCard({ lead, timeZone }: { lead: Lead; timeZone: string }) {
-  const container = getContainer();
-  const messages = container.repo.listMessages(lead.conversationId);
-  const appointment = lead.appointmentId
-    ? container.repo.listAppointments().find((item) => item.id === lead.appointmentId)
-    : undefined;
-  return (
-    <details className="lead" data-testid="lead-row">
-      <summary>
-        <strong>{lead.score}</strong>
-        <span>{STAGE_LABEL[lead.stage]}</span>
-        <span>{leadLabel(lead.channel, summary(lead.slots))}</span>
-      </summary>
-      <div className="transcript">
-        {appointment && appointment.status === 'booked' ? (
-          <p>Booked {formatWhen(appointment.start, timeZone)}</p>
-        ) : null}
-        {messages.map((message) => (
-          <p key={message.id}>
-            <b>{message.role === 'user' ? 'Lead' : 'Desk'}. </b>
-            {message.text}
-          </p>
-        ))}
-      </div>
-    </details>
-  );
+function cardLabel(lead: Lead): string {
+  const kind =
+    lead.channel === 'web'
+      ? 'Site chat'
+      : lead.channel === 'sms'
+        ? 'SMS'
+        : lead.channel === 'email'
+          ? 'Email'
+          : lead.channel === 'instagram'
+            ? 'Instagram'
+            : 'Voice';
+  const bits: string[] = [];
+  if (lead.slots.beds !== undefined && lead.slots.propertyType) {
+    bits.push(`${lead.slots.beds}-bed ${propertyLabel(lead.slots.propertyType)}`);
+  } else if (lead.slots.propertyType) bits.push(propertyLabel(lead.slots.propertyType));
+  if (lead.slots.area) bits.push(lead.slots.area);
+  return bits.length > 0 ? `${kind} · ${bits.join(' ')}` : kind;
 }
 
-function summary(slots: Slots): string {
-  const bits: string[] = [];
-  if (slots.beds !== undefined) bits.push(`${slots.beds}-bed`);
-  if (slots.propertyType) bits.push(propertyLabel(slots.propertyType));
-  if (slots.area) bits.push(slots.area);
-  if (slots.timeline) bits.push(timelineLabel(slots.timeline));
-  return bits.join(' ');
+function budgetLabel(slots: Slots): string {
+  if (slots.budget?.max !== undefined) {
+    return `under $${slots.budget.max.toLocaleString('en-US')}`;
+  }
+  return '';
+}
+
+function buildWeek(
+  timeZone: string,
+  tours: { id: string; start: string; leadId: string; status: string }[],
+  leads: Lead[],
+): WeekDay[] {
+  const days: WeekDay[] = [];
+  for (let index = 0; index < 7; index += 1) {
+    const parts = addCivilDays(new Date(), timeZone, index);
+    const toursToday = tours
+      .filter((tour) => {
+        const when = zonedParts(new Date(tour.start), timeZone);
+        return when.year === parts.year && when.month === parts.month && when.day === parts.day;
+      })
+      .map((tour) => {
+        const lead = leads.find((item) => item.id === tour.leadId);
+        return {
+          id: tour.id,
+          time: formatWhen(tour.start, timeZone).split(',').slice(-1)[0]?.trim() ?? '',
+          title: lead ? cardLabel(lead) : 'Tour',
+        };
+      });
+    days.push({
+      key: `${parts.year}-${parts.month}-${parts.day}`,
+      weekday: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][parts.weekday] ?? '',
+      date: String(parts.day),
+      tours: toursToday,
+    });
+  }
+  return days;
+}
+
+function buildKpis(
+  leads: Lead[],
+  tours: { createdAt?: string; start: string }[],
+  timeZone: string,
+): Kpi[] {
+  const days = Array.from({ length: 7 }, (_, index) =>
+    addCivilDays(new Date(), timeZone, index - 6),
+  );
+  const onDay = (iso: string, index: number) => {
+    const when = zonedParts(new Date(iso), timeZone);
+    const day = days[index];
+    if (!day) return false;
+    return when.year === day.year && when.month === day.month && when.day === day.day;
+  };
+  const leadPoints = days.map(
+    (_, index) => leads.filter((lead) => onDay(lead.createdAt, index)).length,
+  );
+  const tourPoints = days.map(
+    (_, index) => tours.filter((tour) => onDay(tour.start, index)).length,
+  );
+  const qualifiedPoints = days.map(
+    (_, index) =>
+      leads.filter(
+        (lead) =>
+          (lead.stage === 'qualified' || lead.stage === 'booked') && onDay(lead.createdAt, index),
+      ).length,
+  );
+  return [
+    { label: 'Leads in process', value: leads.length, points: leadPoints },
+    { label: 'Tours booked', value: tours.length, points: tourPoints },
+    {
+      label: 'Qualified or booked',
+      value: leads.filter((lead) => lead.stage === 'qualified' || lead.stage === 'booked').length,
+      points: qualifiedPoints,
+    },
+  ];
 }

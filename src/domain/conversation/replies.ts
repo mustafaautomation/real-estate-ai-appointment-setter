@@ -75,12 +75,12 @@ function render(input: ReplyInput): string {
         : 'A person on the desk has this conversation. I will not keep qualifying or booking here.';
     case 'objection_price':
       return spanish
-        ? `Puedo bajar el techo. ${summary(session.slots, true)} Que presupuesto maximo uso?`
-        : `I can lower the ceiling. ${summary(session.slots, false)} What budget should I stay under?`;
+        ? `Puedo bajar el techo. ${knownPrefix(session, true)}Cual es tu presupuesto maximo?`
+        : `I can lower the ceiling. ${knownPrefix(session, false)}What budget should I stay under?`;
     case 'summary':
       return spanish
-        ? `Esto es lo que tengo: ${summary(session.slots, true)} ${ask(session, true)}`
-        : `Here is what I have so far. ${summary(session.slots, false)} ${ask(session, false)}`;
+        ? `Esto es lo que tengo: ${portrait(session.slots, true) || 'todavia poco'}. ${ask(session, true)}`
+        : `Here is what I have so far: ${portrait(session.slots, false) || 'not much yet'}. ${ask(session, false)}`;
     case 'out_of_hours': {
       const next = input.nextSlot
         ? ` Next open slot: ${formatWhen(input.nextSlot.start, input.timeZone)}.`
@@ -95,18 +95,18 @@ function render(input: ReplyInput): string {
         : 'That slot is not open. I can offer the next open slot on a weekday.';
     case 'no_match':
       return spanish
-        ? `Nada en la lista encaja con ${summary(session.slots, true)} Cual condicion aflojo?`
-        : `Nothing on the list fits ${summary(session.slots, false)} Which constraint should I relax?`;
+        ? `Nada en la lista encaja con ${portrait(session.slots, true)}. Cual condicion aflojo?`
+        : `Nothing on the list fits ${portrait(session.slots, false)}. Which constraint should I relax?`;
     case 'listings':
-      return listingReply(session, input.listings, spanish, false);
+      return listingReply(session, input.listings, spanish);
     case 'booked':
       return bookingReply(session, input, spanish, false);
     case 'rescheduled':
       return bookingReply(session, input, spanish, true);
     case 'need_slots':
       return spanish
-        ? `${knownPrefix(session.slots, true)}${ask(session, true)}`
-        : `${knownPrefix(session.slots, false)}${ask(session, false)}`;
+        ? `${knownPrefix(session, true)}${ask(session, true)}`
+        : `${knownPrefix(session, false)}${ask(session, false)}`;
     default:
       return ask(session, spanish);
   }
@@ -128,26 +128,19 @@ function guardrailReply(kind: GuardrailKind, spanish: boolean): string {
     : 'I can not use race, religion, national origin, sex, disability, or familial status to screen homes. I can filter by budget, area, beds, property type, and timeline.';
 }
 
-function listingReply(
-  session: Session,
-  listings: readonly Listing[],
-  spanish: boolean,
-  booked: boolean,
-): string {
-  const lines = listings.map((listing) => listingLine(listing)).join(' ');
+function listingReply(session: Session, _listings: readonly Listing[], spanish: boolean): string {
+  const described = portrait(session.slots, spanish);
   const lead = spanish
-    ? `Tengo estas opciones para ${summary(session.slots, true)}`
+    ? `Tengo estas opciones para ${described}.`
     : `${variant(session.turnCount, [
-        `These fit ${summary(session.slots, false)}`,
-        `Here is what matches ${summary(session.slots, false)}`,
-        `I found homes for ${summary(session.slots, false)}`,
+        `I found homes for ${described}.`,
+        `Here is what matches ${described}.`,
+        `A few places fit ${described}.`,
       ])}`;
-  const close = booked
-    ? ''
-    : spanish
-      ? ' Si quieres una visita, dime que reserve el primer horario.'
-      : ' If you want a tour, say book the earliest slot, or name a weekday time.';
-  return `${lead} ${lines}${close}`.replace(/\s+/g, ' ').trim();
+  const close = spanish
+    ? ' Las fichas de abajo tienen el detalle. Si quieres una visita, dime que reserve el primer horario.'
+    : ' The cards below have the details. If you want a tour, say book the earliest slot, or name a weekday time.';
+  return `${lead}${close}`.replace(/\s+/g, ' ').trim();
 }
 
 function bookingReply(
@@ -166,21 +159,59 @@ function bookingReply(
     : spanish
       ? 'La visita quedo reservada'
       : 'The tour is booked';
-  const homes =
-    input.listings.length > 0
-      ? ` ${input.listings.map((listing) => listingLine(listing)).join(' ')}`
-      : '';
-  return `${verb} for ${when}.${homes}`.replace(/\s+/g, ' ').trim();
+  const home = input.listings[0];
+  const place = home ? ` at ${home.address}, ${home.neighborhood}` : '';
+  return `${verb} for ${when}${place}.`.replace(/\s+/g, ' ').trim();
 }
 
-function listingLine(listing: Listing): string {
-  return `${listing.address}, ${listing.neighborhood}: ${listing.beds} bd ${propertyLabel(listing.type)}, ${formatMoney(listing.price)}.`;
-}
-
-function knownPrefix(slots: Slots, spanish: boolean): string {
-  const text = summary(slots, spanish);
+function knownPrefix(session: Session, spanish: boolean): string {
+  const text = portrait(session.slots, spanish);
   if (!text) return '';
-  return spanish ? `Anotado: ${text} ` : `Noted. ${text} `;
+  return spanish ? `Anotado: ${text}. ` : `${opener(session.turnCount, text)} `;
+}
+
+function opener(turn: number, text: string): string {
+  return variant(turn, [
+    `Thanks, I have ${text}.`,
+    `Okay. I have ${text}.`,
+    `I will stay with ${text}.`,
+  ]);
+}
+
+function portrait(slots: Slots, spanish: boolean): string {
+  const type = slots.propertyType ? propertyLabel(slots.propertyType) : undefined;
+  let home = '';
+  if (slots.beds !== undefined && type) {
+    home = spanish ? `${slots.beds} recamaras en un ${type}` : `a ${slots.beds}-bedroom ${type}`;
+  } else if (type) {
+    home = spanish ? `un ${type}` : `a ${type}`;
+  } else if (slots.beds !== undefined) {
+    home = spanish ? `${slots.beds} recamaras` : `${slots.beds} bedrooms`;
+  }
+  const bits = [
+    home,
+    slots.area ? (spanish ? `en ${slots.area}` : `in ${slots.area}`) : '',
+    budgetPhrase(slots, spanish),
+    slots.timeline ? timelineLabel(slots.timeline) : '',
+  ].filter((bit) => bit.length > 0);
+  return bits.join(', ');
+}
+
+function budgetPhrase(slots: Slots, spanish: boolean): string {
+  if (slots.budget?.max !== undefined && slots.budget.min !== undefined) {
+    return `${formatMoney(slots.budget.min)}–${formatMoney(slots.budget.max)}`;
+  }
+  if (slots.budget?.max !== undefined) {
+    return spanish
+      ? `hasta ${formatMoney(slots.budget.max)}`
+      : `under ${formatMoney(slots.budget.max)}`;
+  }
+  if (slots.budget?.min !== undefined) {
+    return spanish
+      ? `desde ${formatMoney(slots.budget.min)}`
+      : `from ${formatMoney(slots.budget.min)}`;
+  }
+  return '';
 }
 
 export function summary(slots: Slots, spanish: boolean): string {

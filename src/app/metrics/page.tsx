@@ -12,6 +12,8 @@ export default function MetricsPage() {
     const row = measured[channel];
     return { channel, count: row?.count ?? 0, p50: row?.p50 ?? null, p95: row?.p95 ?? null };
   });
+  const bins = histogram(samples.map((sample) => sample.latencyMs));
+  const peak = Math.max(1, ...bins.map((bin) => bin.count));
   return (
     <main className="page metrics">
       <section>
@@ -26,7 +28,19 @@ export default function MetricsPage() {
           <p className="empty" data-testid="metrics-empty">
             No replies measured in this process yet.
           </p>
-        ) : null}
+        ) : (
+          <figure className="hist">
+            <figcaption>Histogram of measured reply time, this process only.</figcaption>
+            <div className="bars" aria-hidden="true">
+              {bins.map((bin) => (
+                <div key={bin.label}>
+                  <span style={{ height: `${Math.max(8, (bin.count / peak) * 140)}px` }} />
+                  <small>{bin.label}</small>
+                </div>
+              ))}
+            </div>
+          </figure>
+        )}
         <div className="metric-table">
           <div className="metric-head">
             <span>Channel</span>
@@ -56,4 +70,23 @@ export default function MetricsPage() {
       </aside>
     </main>
   );
+}
+
+function histogram(values: number[]): { label: string; count: number }[] {
+  if (values.length === 0) return [];
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const span = Math.max(1, max - min);
+  const bins = 6;
+  const counts = Array.from({ length: bins }, () => 0);
+  for (const value of values) {
+    const index = Math.min(bins - 1, Math.floor(((value - min) / span) * bins));
+    const bucket = counts[index];
+    if (bucket !== undefined) counts[index] = bucket + 1;
+  }
+  return counts.map((count, index) => {
+    const from = Math.round(min + (span * index) / bins);
+    const to = Math.round(min + (span * (index + 1)) / bins);
+    return { count, label: `${from}–${to}` };
+  });
 }

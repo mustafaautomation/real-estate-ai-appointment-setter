@@ -39,6 +39,7 @@ export async function acceptInbound(input: {
   requestId: string;
 }): Promise<InboundResult> {
   const container = getContainer();
+  await container.ready;
   const now = input.now ?? new Date();
   const started = performance.now();
   const existing = input.conversationId

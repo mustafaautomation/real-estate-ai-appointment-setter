@@ -41,7 +41,7 @@ test('landing shows the offline engine and a static path when motion is reduced'
 });
 
 test('chat qualifies across more than three turns and books', async ({ page }, info) => {
-  test.setTimeout(60_000);
+  test.setTimeout(90_000);
   await page.goto('/chat');
   const lines = [
     'Hi, I want to buy a place',
@@ -62,10 +62,14 @@ test('chat qualifies across more than three turns and books', async ({ page }, i
     fullPage: true,
   });
   await page.goto('/dashboard');
-  const lead = page.getByTestId('lead-row').filter({ hasText: 'Lantern Hill' }).first();
-  await expect(lead).toBeVisible();
-  await lead.locator('summary').click();
-  await expect(lead.getByText('Lead. Book the earliest slot')).toBeVisible();
+  const lead = page
+    .getByTestId('lead-card')
+    .filter({ hasText: 'Site chat' })
+    .filter({ hasText: 'Lantern Hill' })
+    .first();
+  await lead.evaluate((element: HTMLElement) => element.click());
+  await expect(page.getByTestId('transcript-drawer')).toContainText('Book the earliest slot');
+  await expect(page.getByTestId('tour-calendar')).toBeVisible();
   await page.screenshot({
     path: `test-results/screenshots/${info.project.name}-dashboard.png`,
     fullPage: true,

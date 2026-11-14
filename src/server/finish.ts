@@ -90,6 +90,7 @@ export function publicResult(result: InboundResult) {
       text: message.text,
       mode: message.mode ?? null,
       latencyMs: message.latencyMs ?? null,
+      createdAt: message.createdAt,
     })),
   };
 }
