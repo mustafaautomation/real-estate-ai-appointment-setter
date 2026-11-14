@@ -1,0 +1,18 @@
+services:
+  web:
+    build: .
+    ports:
+      - '3000:3000'
+    environment:
+      STORAGE_DRIVER: sqlite
+      DATABASE_PATH: /data/harborline.db
+      CALENDAR_PROVIDER: memory
+      TWILIO_AUTH_TOKEN: test-twilio-token
+      META_APP_SECRET: test-meta-secret
+      META_VERIFY_TOKEN: test-meta-verify
+      BROKERAGE_TIMEZONE: America/Chicago
+    volumes:
+      - harborline:/data
+
+volumes:
+  harborline:

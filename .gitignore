@@ -1,0 +1,17 @@
+node_modules
+.next
+out
+dist
+coverage
+playwright-report
+test-results
+.lighthouseci
+.env
+.env.local
+.env.*.local
+data/*.db
+data/*.db-*
+*.tsbuildinfo
+npm-debug.log*
+.DS_Store
+.vercel

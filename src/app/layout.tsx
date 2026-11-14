@@ -1,0 +1,36 @@
+import type { Metadata } from 'next';
+import type { ReactNode } from 'react';
+import { Outfit, Syne } from 'next/font/google';
+
+import { configuredLlmMode } from '@/adapters/llm/model';
+import { Header } from '@/components/header';
+
+import './globals.css';
+
+const display = Syne({ subsets: ['latin'], weight: ['700', '800'], variable: '--font-display' });
+const sans = Outfit({ subsets: ['latin'], weight: ['400', '500', '600'], variable: '--font-sans' });
+
+export const dynamic = 'force-dynamic';
+
+export const metadata: Metadata = {
+  title: { default: 'Harborline Desk', template: '%s · Harborline Desk' },
+  description:
+    'Personal demo of one qualification desk for site chat, SMS, email, and Instagram. Synthetic listings. Fictional brokerage.',
+};
+
+export default function RootLayout({ children }: { children: ReactNode }) {
+  return (
+    <html lang="en" className={`${display.variable} ${sans.variable}`}>
+      <body>
+        <a className="skip" href="#content">
+          Skip to content
+        </a>
+        <Header mode={configuredLlmMode()} />
+        <div id="content">{children}</div>
+        <footer className="site-footer">
+          Synthetic listings. Harborline Realty is fictional. Personal demo by Muhammad Mustafa.
+        </footer>
+      </body>
+    </html>
+  );
+}

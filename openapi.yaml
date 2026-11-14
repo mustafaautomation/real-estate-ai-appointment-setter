@@ -1,0 +1,296 @@
+openapi: 3.1.0
+info:
+  title: Harborline Desk
+  version: 1.0.0
+  description: |
+    Demo HTTP API. Synthetic data. Voice is a stub and does not book.
+    Webhook signatures are required for the Twilio-shaped and Meta-shaped routes.
+servers:
+  - url: http://127.0.0.1:3000
+paths:
+  /api/health:
+    get:
+      operationId: health
+      responses:
+        '200':
+          description: Process status. llm is offline or openai. voice is always stub.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, llm, storage, calendar, voice, timezone]
+                properties:
+                  ok: { type: boolean }
+                  llm: { type: string, enum: [offline, openai] }
+                  storage: { type: string, enum: [memory, sqlite] }
+                  calendar: { type: string, enum: [memory, calcom, google] }
+                  voice: { type: string, enum: [stub] }
+                  timezone: { type: string }
+  /api/chat:
+    post:
+      operationId: chat
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [text]
+              properties:
+                text: { type: string, minLength: 1, maxLength: 4000 }
+                conversationId: { type: string, format: uuid }
+                idempotencyKey: { type: string, minLength: 8, maxLength: 80 }
+      responses:
+        '200':
+          description: Assistant turn. mode is the path that produced the reply.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Turn'
+        '400':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+  /api/webhooks/sms:
+    post:
+      operationId: smsWebhook
+      parameters:
+        - in: header
+          name: X-Twilio-Signature
+          required: true
+          schema: { type: string }
+        - in: header
+          name: X-Harborline-Response
+          schema: { type: string, enum: [json] }
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [MessageSid, From, To, Body]
+              properties:
+                MessageSid: { type: string }
+                From: { type: string }
+                To: { type: string }
+                Body: { type: string }
+                AccountSid: { type: string }
+      responses:
+        '200':
+          description: TwiML by default, or the Turn JSON when the response header asks for json.
+        '401':
+          $ref: '#/components/responses/Error'
+  /api/webhooks/email:
+    post:
+      operationId: emailWebhook
+      parameters:
+        - in: header
+          name: X-Harborline-Signature
+          required: false
+          schema: { type: string }
+          description: Required only when EMAIL_WEBHOOK_SECRET is set. Hex HMAC-SHA256 of the raw body.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [messageId, from, to, text]
+              properties:
+                messageId: { type: string }
+                from: { type: string }
+                to: { type: string }
+                subject: { type: string }
+                text: { type: string }
+      responses:
+        '200':
+          description: Reply plus the Turn fields.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Turn'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+  /api/webhooks/instagram:
+    get:
+      operationId: instagramVerify
+      parameters:
+        - in: query
+          name: hub.mode
+          schema: { type: string }
+        - in: query
+          name: hub.verify_token
+          schema: { type: string }
+        - in: query
+          name: hub.challenge
+          schema: { type: string }
+      responses:
+        '200':
+          description: Raw hub.challenge when the verify token matches.
+          content:
+            text/plain:
+              schema: { type: string }
+        '403':
+          $ref: '#/components/responses/Error'
+    post:
+      operationId: instagramWebhook
+      parameters:
+        - in: header
+          name: X-Hub-Signature-256
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [object, entry]
+              properties:
+                object: { type: string, enum: [instagram] }
+                entry:
+                  type: array
+                  items:
+                    type: object
+      responses:
+        '200':
+          description: Graph-style recipient plus the Turn fields. The route does not call Meta.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Turn'
+        '401':
+          $ref: '#/components/responses/Error'
+  /api/webhooks/voice:
+    get:
+      operationId: voiceStubInfo
+      responses:
+        '200':
+          description: States that voice is not live.
+    post:
+      operationId: voiceStub
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [callId, tool]
+              properties:
+                callId: { type: string }
+                tool:
+                  type: object
+                  required: [name, arguments]
+                  properties:
+                    name: { type: string, enum: [qualify_lead, book_appointment] }
+                    arguments: { type: object }
+      responses:
+        '200':
+          description: Validation only. executed is false. No appointment is written.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [live, mode, validated, executed]
+                properties:
+                  live: { type: boolean, enum: [false] }
+                  mode: { type: string, enum: [stub] }
+                  validated: { type: boolean }
+                  executed: { type: boolean, enum: [false] }
+                  tool: { type: string }
+  /api/leads:
+    get:
+      operationId: listLeads
+      responses:
+        '200':
+          description: Leads and appointments stored in this process. External ids are not included.
+  /api/leads/{id}:
+    get:
+      operationId: getLead
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Lead plus transcript.
+        '404':
+          $ref: '#/components/responses/Error'
+  /api/metrics:
+    get:
+      operationId: metrics
+      responses:
+        '200':
+          description: Nearest-rank p50 and p95. Null when that channel has no samples.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [method, scope, channels, sampleCount]
+                properties:
+                  method: { type: string, enum: [nearest-rank] }
+                  scope: { type: string, enum: [this-process] }
+                  sampleCount: { type: integer }
+                  channels:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        channel: { type: string }
+                        count: { type: integer }
+                        p50: { type: [integer, 'null'] }
+                        p95: { type: [integer, 'null'] }
+  /api/simulator/dispatch:
+    post:
+      operationId: simulatorDispatch
+      description: Signs a sample payload with the configured test secret and calls the matching webhook handler.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [channel, text, externalUserId]
+              properties:
+                channel: { type: string, enum: [sms, email, instagram] }
+                text: { type: string }
+                externalUserId: { type: string }
+                externalMessageId: { type: string }
+      responses:
+        '200':
+          description: Webhook JSON response.
+components:
+  schemas:
+    Turn:
+      type: object
+      required: [reply, mode, conversationId, leadId, stage, slots, score]
+      properties:
+        reply: { type: string }
+        mode: { type: string, enum: [offline, openai, offline_fallback] }
+        conversationId: { type: string }
+        leadId: { type: string }
+        stage: { type: string }
+        score: { type: integer }
+        slots: { type: object }
+        listings: { type: array, items: { type: object } }
+        appointment:
+          type: [object, 'null']
+        guardrail:
+          type: [string, 'null']
+  responses:
+    Error:
+      description: Error
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: object
+                properties:
+                  code: { type: string }
+                  message: { type: string }
+                  requestId: { type: string }
