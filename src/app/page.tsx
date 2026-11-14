@@ -42,18 +42,20 @@ export default function HomePage() {
           </ul>
         </div>
         <div className="stage" aria-hidden="true">
-          <article className="float ig">
-            <span>Instagram</span>
-            <p>3-bed condo in Lantern Hill?</p>
-          </article>
-          <article className="float sms">
-            <span>SMS</span>
-            <p>Under 700k, within 30 days.</p>
-          </article>
-          <article className="float mail">
-            <span>Email</span>
-            <p>Can we tour this week?</p>
-          </article>
+          <div className="channel-row">
+            <article className="chan">
+              <span>Instagram</span>
+              <p>3-bed condo in Lantern Hill?</p>
+            </article>
+            <article className="chan">
+              <span>SMS</span>
+              <p>Under 700k, this month.</p>
+            </article>
+            <article className="chan">
+              <span>Email</span>
+              <p>Can we tour this week?</p>
+            </article>
+          </div>
           <article className="thread-card">
             <header>
               <strong>One thread</strong>
@@ -74,8 +76,8 @@ export default function HomePage() {
                 <b>Tour booked</b>
                 <small>Weekday morning · Cedar Bay</small>
               </div>
+              <span className="flow-packet" data-testid="flow-packet" />
             </div>
-            <span className="flow-packet" data-testid="flow-packet" />
           </article>
         </div>
       </section>

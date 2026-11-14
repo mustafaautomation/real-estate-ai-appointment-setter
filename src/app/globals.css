@@ -215,10 +215,37 @@ button:disabled {
   font-size: clamp(3.2rem, 5.4vw, 6.1rem);
 }
 .stage {
-  position: relative;
-  min-height: 520px;
-  overflow: hidden;
-  border-radius: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+}
+.channel-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.chan {
+  padding: 12px 14px;
+  border-radius: 18px;
+  background: var(--glass);
+  border: 1px solid var(--line);
+  animation: slideIn 0.7s both;
+}
+.chan:nth-child(2) {
+  animation-delay: 0.12s;
+}
+.chan:nth-child(3) {
+  animation-delay: 0.24s;
+}
+.chan span {
+  color: var(--muted);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.chan p {
+  margin: 6px 0 0;
 }
 .float,
 .thread-card,
@@ -263,19 +290,19 @@ button:disabled {
   animation-delay: -4s;
 }
 .thread-card {
-  position: absolute;
-  inset: 70px 40px 40px 70px;
+  position: relative;
   padding: 16px;
-  overflow: hidden;
 }
 .thread-card header {
   display: flex;
   justify-content: space-between;
 }
 .line,
-.chip-row span,
-.book-card {
-  animation: arrive 5.5s ease-in-out infinite;
+.chip-row span {
+  animation: arrive 0.55s ease both;
+}
+.l1 {
+  animation-delay: 0.2s;
 }
 .l2 {
   animation-delay: 0.4s;
@@ -291,10 +318,23 @@ button:disabled {
   border: 1px solid var(--line);
   padding: 4px 8px;
   font-size: 0.8rem;
-  animation-delay: 0.8s;
+  animation-delay: 0.45s;
+}
+.chip-row span:nth-child(2) {
+  animation-delay: 0.6s;
+}
+.chip-row span:nth-child(3) {
+  animation-delay: 0.75s;
+}
+.chip-row span:nth-child(4) {
+  animation-delay: 0.9s;
+}
+.chip-row span:nth-child(5) {
+  animation-delay: 1.05s;
 }
 .book-card,
 .confirm-card {
+  position: relative;
   display: flex;
   gap: 10px;
   align-items: center;
@@ -302,7 +342,7 @@ button:disabled {
   border-radius: 16px;
   border: 1px solid rgba(255, 77, 28, 0.45);
   background: rgba(255, 77, 28, 0.08);
-  animation-delay: 1.2s;
+  animation: pulse 2.6s ease-in-out 1.2s infinite;
 }
 .book-card div,
 .confirm-card div {
@@ -330,7 +370,7 @@ button:disabled {
   box-shadow: 0 0 16px var(--accent);
   left: 12px;
   bottom: 16px;
-  animation: travel 4.8s ease-in-out infinite alternate;
+  animation: travel 3.2s ease-in-out infinite alternate;
 }
 .pipe {
   display: grid;
@@ -365,6 +405,7 @@ button:disabled {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 14px;
+  align-items: start;
 }
 .mock {
   padding: 16px;
@@ -407,10 +448,13 @@ button:disabled {
   padding: 0;
 }
 .messenger,
-.metrics,
-.inbox-grid {
+.metrics {
   display: grid;
   grid-template-columns: 1.4fr 0.7fr;
+  gap: 16px;
+}
+.inbox-grid {
+  display: grid;
   gap: 16px;
 }
 .thread,
@@ -508,6 +552,10 @@ button:disabled {
   grid-template-columns: 92px 1fr;
   overflow: hidden;
   padding: 0;
+  margin-top: 8px;
+}
+.home-card.held {
+  outline: 1px solid var(--accent);
 }
 .home-photo {
   min-height: 100%;
@@ -687,24 +735,45 @@ textarea {
 }
 .week-grid {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 6px;
+  grid-template-columns: repeat(7, minmax(140px, 1fr));
+  gap: 8px;
 }
 .day {
-  min-height: 96px;
+  min-height: 88px;
   border-top: 2px solid var(--accent);
-  padding-top: 6px;
+  padding-top: 8px;
+  display: grid;
+  gap: 8px;
 }
-.day span {
+.day-label {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+.day-label span {
   color: var(--muted);
-  font-size: 0.72rem;
+  font-size: 0.78rem;
 }
-.day p {
-  margin: 6px 0 0;
-  font-size: 0.75rem;
-  background: rgba(255, 77, 28, 0.12);
-  border-radius: 8px;
-  padding: 4px;
+.day-tours {
+  display: grid;
+  gap: 6px;
+}
+.tour-chip {
+  margin: 0;
+  padding: 8px;
+  border-radius: 10px;
+  background: rgba(255, 77, 28, 0.14);
+}
+.tour-chip b,
+.tour-chip span {
+  display: block;
+}
+.tour-chip b {
+  font-size: 0.85rem;
+}
+.tour-chip span {
+  font-size: 0.82rem;
+  color: var(--ink);
 }
 .device {
   padding: 0;
@@ -814,21 +883,29 @@ textarea {
   padding: 0;
   list-style: none;
 }
-@keyframes drift {
-  50% {
-    transform: translateY(-8px);
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
   }
 }
 @keyframes arrive {
-  0%,
-  15% {
+  from {
     opacity: 0;
-    transform: translateY(8px);
+    transform: translateY(6px);
   }
-  30%,
-  100% {
+  to {
     opacity: 1;
     transform: none;
+  }
+}
+@keyframes pulse {
+  50% {
+    box-shadow: 0 0 0 4px rgba(255, 77, 28, 0.2);
   }
 }
 @keyframes travel {
@@ -836,7 +913,7 @@ textarea {
     transform: translateX(0);
   }
   to {
-    transform: translateX(180px);
+    transform: translateX(24px);
   }
 }
 @keyframes blink {
@@ -863,18 +940,19 @@ textarea {
     width: 2px;
     justify-self: center;
   }
-  .stage {
-    min-height: 420px;
+  .week-grid {
+    grid-template-columns: 1fr;
   }
-  .float.mail {
-    display: none;
+  .day {
+    grid-template-columns: 64px minmax(0, 1fr);
+    align-items: start;
+    min-height: 0;
   }
-  .thread-card {
-    inset: 108px 8px 10px 8px;
+  .day-label {
+    display: grid;
   }
-  .float {
-    width: 46%;
-    padding: 8px 10px;
+  .day-tours {
+    min-width: 0;
   }
   .kanban {
     display: flex;
@@ -886,12 +964,8 @@ textarea {
     min-width: 240px;
     scroll-snap-align: start;
   }
-  .week-grid {
-    display: flex;
-    overflow-x: auto;
-  }
-  .day {
-    min-width: 88px;
+  .channel-row {
+    grid-template-columns: 1fr;
   }
   h1 {
     font-size: clamp(3rem, 16vw, 4.4rem);
@@ -904,7 +978,7 @@ textarea {
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .float,
+  .chan,
   .line,
   .chip-row span,
   .book-card,

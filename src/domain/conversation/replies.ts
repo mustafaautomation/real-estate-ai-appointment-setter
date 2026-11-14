@@ -165,17 +165,27 @@ function bookingReply(
 }
 
 function knownPrefix(session: Session, spanish: boolean): string {
-  const text = portrait(session.slots, spanish);
-  if (!text) return '';
-  return spanish ? `Anotado: ${text}. ` : `${opener(session.turnCount, text)} `;
+  const bit = latestBit(session.slots, spanish);
+  if (!bit) return '';
+  if (spanish) return `Anotado: ${bit}. `;
+  return `${variant(session.turnCount, [`Great, ${bit}.`, `Got it, ${bit}.`, `Perfect, ${bit}.`, `Sounds good, ${bit}.`])} `;
 }
 
-function opener(turn: number, text: string): string {
-  return variant(turn, [
-    `Thanks, I have ${text}.`,
-    `Okay. I have ${text}.`,
-    `I will stay with ${text}.`,
-  ]);
+function latestBit(slots: Slots, spanish: boolean): string {
+  const order = [...ASK_ORDER].reverse();
+  const key = order.find((item) => hasSlot(slots, item));
+  if (!key) return '';
+  if (key === 'propertyType' && slots.propertyType) {
+    const label = propertyLabel(slots.propertyType);
+    return spanish ? `un ${label}` : `a ${label}`;
+  }
+  if (key === 'beds' && slots.beds !== undefined) {
+    return spanish ? `${slots.beds} recamaras` : `${slots.beds} bedrooms`;
+  }
+  if (key === 'area' && slots.area) return slots.area;
+  if (key === 'budget') return budgetPhrase(slots, spanish);
+  if (key === 'timeline' && slots.timeline) return timelineLabel(slots.timeline);
+  return '';
 }
 
 function portrait(slots: Slots, spanish: boolean): string {
@@ -263,21 +273,25 @@ const QUESTIONS_EN: Record<SlotKey, readonly string[]> = {
     'Condo, townhouse, house, or multi-family?',
     'Which property type should I use?',
   ],
-  beds: ['How many bedrooms do you want?', 'What bedroom count should I use?', 'How many beds?'],
+  beds: [
+    'How many bedrooms do you need?',
+    'How many bedrooms should I look for?',
+    'What bedroom count works?',
+  ],
   area: [
-    'Which area should I use: Lantern Hill, North Wharf, Old Keel, Glassmarket, Reed Shores, or Millcross?',
-    'Which of those neighborhoods should I search?',
-    'What area are you headed toward?',
+    'Which area are you looking at?',
+    'Which neighborhood should I search?',
+    'Where in Cedar Bay do you want to be?',
   ],
   budget: [
     'What budget should I stay under?',
-    'What price ceiling should I use?',
-    'How much are you looking to spend?',
+    'What price range should I use?',
+    'How much are you hoping to spend?',
   ],
   timeline: [
+    'When do you want to move?',
     'What is your timeline?',
-    'When do you want to be in the home?',
-    'How soon are you looking to move?',
+    'How soon are you hoping to be in?',
   ],
 };
 

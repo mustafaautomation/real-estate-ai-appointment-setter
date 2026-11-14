@@ -55,7 +55,8 @@ export function ChatPanel() {
   const [transcript, setTranscript] = useState<TranscriptItem[]>([]);
   const [slots, setSlots] = useState<SlotState>({});
   const [score, setScore] = useState(0);
-  const [listings, setListings] = useState<ListingCard[]>([]);
+  const [offers, setOffers] = useState<Record<string, ListingCard[]>>({});
+  const [bookedHomeId, setBookedHomeId] = useState<string | null>(null);
   const [appointment, setAppointment] = useState<string | null>(null);
   const [mode, setMode] = useState('offline');
   const [pending, setPending] = useState(false);
@@ -87,7 +88,12 @@ export function ChatPanel() {
       setTranscript(payload.transcript);
       setSlots(payload.slots);
       setScore(payload.score);
-      setListings(payload.listings);
+      setOffers((current) => {
+        if (Object.keys(current).length > 0 || payload.listings.length === 0) return current;
+        const offer = [...payload.transcript].reverse().find((item) => item.role === 'assistant');
+        return offer ? { [offer.id]: payload.listings } : current;
+      });
+      if (payload.appointment && payload.listings[0]) setBookedHomeId(payload.listings[0].id);
       setAppointment(payload.appointment?.label ?? null);
       setMode(payload.mode);
     } catch {
@@ -141,6 +147,39 @@ export function ChatPanel() {
                   {item.createdAt ? (
                     <time dateTime={item.createdAt}>{clock(item.createdAt)}</time>
                   ) : null}
+                  {offers[item.id] ? (
+                    <ul className="homes">
+                      {offers[item.id]?.map((listing) => (
+                        <li
+                          key={listing.id}
+                          className={listing.id === bookedHomeId ? 'home-card held' : 'home-card'}
+                        >
+                          <div
+                            className={`home-photo tone-${listing.id.slice(-1)}`}
+                            aria-hidden="true"
+                          />
+                          <div>
+                            <strong>{listing.address}</strong>
+                            <p>
+                              {listing.neighborhood} · {listing.beds} bd ·{' '}
+                              {listing.type.replaceAll('_', ' ')}
+                            </p>
+                            <p className="price">${listing.price.toLocaleString('en-US')}</p>
+                            {listing.id === bookedHomeId ? (
+                              <p className="held-label">Booked for the tour</p>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => void submit('Book the earliest slot')}
+                              >
+                                Book tour
+                              </button>
+                            )}
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
                 </div>
               </article>
             ))
@@ -154,26 +193,6 @@ export function ChatPanel() {
                 <i />
               </div>
             </article>
-          ) : null}
-          {listings.length > 0 ? (
-            <ul className="homes">
-              {listings.map((listing) => (
-                <li key={listing.id} className="home-card">
-                  <div className={`home-photo tone-${listing.id.slice(-1)}`} aria-hidden="true" />
-                  <div>
-                    <strong>{listing.address}</strong>
-                    <p>
-                      {listing.neighborhood} · {listing.beds} bd ·{' '}
-                      {listing.type.replaceAll('_', ' ')}
-                    </p>
-                    <p className="price">${listing.price.toLocaleString('en-US')}</p>
-                    <button type="button" onClick={() => void submit('Book the earliest slot')}>
-                      Book tour
-                    </button>
-                  </div>
-                </li>
-              ))}
-            </ul>
           ) : null}
           {appointment ? (
             <article className="confirm-card" data-testid="booking-confirmation">

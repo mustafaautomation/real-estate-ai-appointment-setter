@@ -1,4 +1,4 @@
-import { addCivilDays, formatWhen, zonedParts } from '@/domain/booking/time';
+import { addCivilDays, zonedParts } from '@/domain/booking/time';
 import { propertyLabel } from '@/domain/qualification/slots';
 import type { Lead, Slots } from '@/domain/types';
 import { Inbox, type InboxCard, type Kpi, type WeekDay } from '@/components/inbox';
@@ -23,6 +23,7 @@ export default async function DashboardPage() {
     label: cardLabel(lead),
     budget: budgetLabel(lead.slots),
     area: lead.slots.area ?? '',
+    preview: previewFor(container.repo.listMessages(lead.conversationId)),
     transcript: container.repo.listMessages(lead.conversationId).map((message) => ({
       id: message.id,
       role: message.role,
@@ -65,6 +66,17 @@ function cardLabel(lead: Lead): string {
   return bits.length > 0 ? `${kind} · ${bits.join(' ')}` : kind;
 }
 
+function tourTitle(lead: Lead): string {
+  const who = cardLabel(lead).split(' · ')[0] ?? 'Lead';
+  return lead.slots.area ? `${who} · ${lead.slots.area}` : who;
+}
+
+function previewFor(messages: { role: string; text: string }[]): string {
+  const first = messages.find((message) => message.role === 'user');
+  if (!first) return '';
+  return first.text.length > 72 ? `${first.text.slice(0, 69)}…` : first.text;
+}
+
 function budgetLabel(slots: Slots): string {
   if (slots.budget?.max !== undefined) {
     return `under $${slots.budget.max.toLocaleString('en-US')}`;
@@ -89,8 +101,12 @@ function buildWeek(
         const lead = leads.find((item) => item.id === tour.leadId);
         return {
           id: tour.id,
-          time: formatWhen(tour.start, timeZone).split(',').slice(-1)[0]?.trim() ?? '',
-          title: lead ? cardLabel(lead) : 'Tour',
+          time: new Intl.DateTimeFormat('en-US', {
+            timeZone,
+            hour: 'numeric',
+            minute: '2-digit',
+          }).format(new Date(tour.start)),
+          title: lead ? tourTitle(lead) : 'Tour',
         };
       });
     days.push({

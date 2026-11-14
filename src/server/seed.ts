@@ -13,6 +13,16 @@ type Profile = {
   book: boolean;
 };
 
+function openingLine(profile: Profile): string {
+  if (profile.key === '01') return 'Hi, are you free to chat about a place?';
+  if (profile.key === '02') return 'Saw the post. Is it still available?';
+  if (profile.slots.area && profile.slots.beds) {
+    return `Synthetic note. Looking at ${profile.slots.beds} bedrooms in ${profile.slots.area}.`;
+  }
+  if (profile.slots.area) return `Synthetic note. Curious about ${profile.slots.area}.`;
+  return 'Synthetic note. Just starting to look.';
+}
+
 const PROFILES: readonly Profile[] = [
   { key: '01', channel: 'sms', stage: 'new', slots: {}, daysAgo: 1, book: false },
   { key: '02', channel: 'instagram', stage: 'new', slots: {}, daysAgo: 0, book: false },
@@ -165,15 +175,15 @@ export async function seedDemo(container: Container): Promise<void> {
       createdAt: created,
       updatedAt: created,
     });
+    container.repo.addMessage({
+      id: `synthetic-msg-${profile.key}-user`,
+      conversationId,
+      role: 'user',
+      text: openingLine(profile),
+      channel: profile.channel,
+      createdAt: created,
+    });
     if (profile.stage !== 'new') {
-      container.repo.addMessage({
-        id: `synthetic-msg-${profile.key}-user`,
-        conversationId,
-        role: 'user',
-        text: 'Synthetic sample. I am looking around Harborline.',
-        channel: profile.channel,
-        createdAt: created,
-      });
       container.repo.addMessage({
         id: `synthetic-msg-${profile.key}-desk`,
         conversationId,

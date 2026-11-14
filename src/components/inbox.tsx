@@ -15,6 +15,7 @@ export type InboxCard = {
   label: string;
   budget: string;
   area: string;
+  preview: string;
   transcript: { id: string; role: 'user' | 'assistant'; text: string; createdAt: string }[];
 };
 
@@ -83,9 +84,7 @@ export function Inbox({ leads, week, kpis }: { leads: InboxCard[]; week: WeekDay
                         <ScoreRing score={card.score} />
                       </span>
                       <strong>{card.label}</strong>
-                      <span className="card-meta">
-                        {card.area || 'Area open'} · {card.budget || 'Budget open'}
-                      </span>
+                      <span className="card-meta">{cardMeta(card)}</span>
                       {card.synthetic ? <em>Synthetic</em> : <em>This process</em>}
                     </button>
                   ))}
@@ -124,15 +123,18 @@ export function Inbox({ leads, week, kpis }: { leads: InboxCard[]; week: WeekDay
           <div className="week-grid">
             {week.map((day) => (
               <div key={day.key} className="day">
-                <span>{day.weekday}</span>
-                <strong>{day.date}</strong>
-                {day.tours.map((tour) => (
-                  <p key={tour.id}>
-                    {tour.time}
-                    <br />
-                    {tour.title}
-                  </p>
-                ))}
+                <div className="day-label">
+                  <span>{day.weekday}</span>
+                  <strong>{day.date}</strong>
+                </div>
+                <div className="day-tours">
+                  {day.tours.map((tour) => (
+                    <p key={tour.id} className="tour-chip">
+                      <b>{tour.time}</b>
+                      <span>{tour.title}</span>
+                    </p>
+                  ))}
+                </div>
               </div>
             ))}
           </div>
@@ -140,6 +142,13 @@ export function Inbox({ leads, week, kpis }: { leads: InboxCard[]; week: WeekDay
       </div>
     </div>
   );
+}
+
+function cardMeta(card: InboxCard): string {
+  if (card.area || card.budget) {
+    return [card.area, card.budget].filter((part) => part.length > 0).join(' · ');
+  }
+  return card.preview || 'New note';
 }
 
 function Spark({ points }: { points: number[] }) {
