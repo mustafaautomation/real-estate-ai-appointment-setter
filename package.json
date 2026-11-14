@@ -30,7 +30,7 @@
   "devDependencies": {
     "@axe-core/playwright": "^4.10.2",
     "@eslint/eslintrc": "^3.3.1",
-    "@lhci/cli": "^0.15.1",
+    "@lhci/cli": "^0.16.0",
     "@playwright/test": "^1.55.0",
     "@types/node": "^22.17.2",
     "@types/react": "^19.1.12",
