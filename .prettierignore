@@ -6,3 +6,4 @@ test-results
 .lighthouseci
 package-lock.json
 data
+src/fonts

@@ -1,14 +1,24 @@
 import type { Metadata } from 'next';
+import localFont from 'next/font/local';
 import type { ReactNode } from 'react';
-import { Outfit, Syne } from 'next/font/google';
 
 import { configuredLlmMode } from '@/adapters/llm/model';
 import { Header } from '@/components/header';
 
 import './globals.css';
 
-const display = Syne({ subsets: ['latin'], weight: ['700', '800'], variable: '--font-display' });
-const sans = Outfit({ subsets: ['latin'], weight: ['400', '500', '600'], variable: '--font-sans' });
+const display = localFont({
+  src: '../fonts/syne-latin.woff2',
+  weight: '700 800',
+  variable: '--font-display',
+  display: 'swap',
+});
+const sans = localFont({
+  src: '../fonts/outfit-latin.woff2',
+  weight: '400 600',
+  variable: '--font-sans',
+  display: 'swap',
+});
 
 export const dynamic = 'force-dynamic';
 

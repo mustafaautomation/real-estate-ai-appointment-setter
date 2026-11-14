@@ -1,0 +1,9 @@
+Outfit
+Copyright 2021 The Outfit Project Authors (https://github.com/Outfitio/Outfit-Fonts)
+Syne
+Copyright 2017 The Syne Project Authors (https://github.com/bonjour-monde/syne)
+
+These files are the latin subsets published by Google Fonts.
+Both families are licensed under the SIL Open Font License, Version 1.1.
+The license text is at https://openfontlicense.org/open-font-license-official-text/
+The font files in this directory are unmodified.
