@@ -79,19 +79,20 @@ export class RelayClient {
     temperature?: number;
     responseFormat?: { type: 'json_object' } | { type: 'json_schema'; json_schema: unknown };
   }): Promise<{ content: string; model: string | null; latencyMs: number | null }> {
+    const body: Record<string, unknown> = {
+      messages: input.messages,
+      max_tokens: Math.min(600, input.maxTokens ?? 500),
+      temperature: input.temperature ?? 0.2,
+      response_format: input.responseFormat ?? { type: 'json_object' },
+    };
+    if (input.model) body.model = input.model;
     const payload = await this.request<{
       content?: unknown;
       model?: unknown;
       latency_ms?: unknown;
     }>('/v1/chat', {
       method: 'POST',
-      body: {
-        messages: input.messages,
-        model: input.model ?? 'llama-3.3-70b',
-        max_tokens: Math.min(600, input.maxTokens ?? 500),
-        temperature: input.temperature ?? 0.2,
-        response_format: input.responseFormat ?? { type: 'json_object' },
-      },
+      body,
     });
     if (typeof payload.content !== 'string' || payload.content.trim().length === 0) {
       throw new RelayHttpError(502, 'bad_model_payload', '/v1/chat');

@@ -45,8 +45,8 @@ describe('relay client', () => {
     const headers = init.headers as Record<string, string>;
     expect(headers.authorization).toBe('Bearer secret');
     expect(headers['x-client-ip']).toBe('203.0.113.8');
-    const body = JSON.parse(String(init.body)) as { max_tokens: number; model: string };
-    expect(body.model).toBe('llama-3.3-70b');
+    const body = JSON.parse(String(init.body)) as { max_tokens: number; model?: string };
+    expect(body.model).toBeUndefined();
     expect(body.max_tokens).toBeLessThanOrEqual(600);
     expect(storeId('web:lead')).toBe('web:lead');
     expect(storeId('has a space')).toMatch(/^id\.[a-f0-9]{40}$/);
