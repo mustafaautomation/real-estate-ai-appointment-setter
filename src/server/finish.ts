@@ -4,6 +4,8 @@ import type { IdempotencyRecord } from '@/domain/types';
 
 import { getContainer } from './container';
 import type { InboundResult } from './inbound';
+import { rateLimitMessage } from './limits';
+import { runWithClientIp } from './request-context';
 
 export async function guarded(
   request: Request,
@@ -11,18 +13,20 @@ export async function guarded(
   run: (requestId: string) => Promise<Response>,
 ): Promise<Response> {
   const requestId = requestIdOf(request);
-  try {
-    if (!allowRequest(`${bucket}:${clientKey(request)}`)) {
-      return json(
-        { error: { code: 'rate_limited', message: 'Too many requests', requestId } },
-        429,
-        requestId,
-      );
+  return runWithClientIp(clientKey(request), async () => {
+    try {
+      if (!allowRequest(`${bucket}:${clientKey(request)}`)) {
+        return json(
+          { error: { code: 'rate_limited', message: rateLimitMessage(), requestId } },
+          429,
+          requestId,
+        );
+      }
+      return await run(requestId);
+    } catch (error) {
+      return errorResponse(error, requestId);
     }
-    return await run(requestId);
-  } catch (error) {
-    return errorResponse(error, requestId);
-  }
+  });
 }
 
 export async function withIdempotency(
@@ -34,7 +38,7 @@ export async function withIdempotency(
   const repo = getContainer().repo;
   const now = new Date().toISOString();
   const pending: IdempotencyRecord = { key, status: 0, contentType, body: '', createdAt: now };
-  const existing = repo.claimIdempotency(pending);
+  const existing = await repo.claimIdempotency(pending);
   if (existing && existing.status === 0) {
     return json(
       { error: { code: 'in_progress', message: 'Duplicate request is in progress', requestId } },
@@ -54,13 +58,13 @@ export async function withIdempotency(
   }
   try {
     const body = await produce();
-    repo.saveIdempotency({ key, status: 200, contentType, body, createdAt: now });
+    await repo.saveIdempotency({ key, status: 200, contentType, body, createdAt: now });
     return new Response(body, {
       status: 200,
       headers: { 'content-type': contentType, 'x-request-id': requestId },
     });
   } catch (error) {
-    repo.deleteIdempotency(key);
+    await repo.deleteIdempotency(key);
     throw error;
   }
 }

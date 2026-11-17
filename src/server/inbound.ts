@@ -1,12 +1,25 @@
+import { isRelayFallback } from '@/adapters/relay/client';
+import { qualifyWithRelay, replyLooksUsable } from '@/adapters/relay/qualify';
+import { hasBookingIntent, isStopKeyword, wantsHuman } from '@/domain/booking/schedule';
 import { formatWhen } from '@/domain/booking/time';
-import { handleTurn } from '@/domain/conversation/engine';
+import { handleTurn, type TurnDecision } from '@/domain/conversation/engine';
 import { createSession } from '@/domain/conversation/session';
 import { AppError } from '@/domain/errors';
+import { classifyGuardrail } from '@/domain/guardrails/policy';
 import { LISTINGS } from '@/domain/listings/data';
 import { pipelineStage, qualificationScore } from '@/domain/qualification/score';
-import type { Channel, Conversation, Lead, ReplyMode, StoredMessage } from '@/domain/types';
+import { mergeSlots } from '@/domain/qualification/slots';
+import type {
+  Channel,
+  Conversation,
+  Lead,
+  ReplyMode,
+  Session,
+  StoredMessage,
+} from '@/domain/types';
 
 import { getContainer } from './container';
+import { MAX_MESSAGE_CHARS, MAX_TURNS, tooLongMessage, turnLimitMessage } from './limits';
 
 export type InboundResult = {
   reply: string;
@@ -43,29 +56,91 @@ export async function acceptInbound(input: {
   const now = input.now ?? new Date();
   const started = performance.now();
   const existing = input.conversationId
-    ? container.repo.getConversation(input.conversationId)
-    : container.repo.findConversation(input.channel, input.externalUserId);
+    ? await container.repo.getConversation(input.conversationId)
+    : await container.repo.findConversation(input.channel, input.externalUserId);
   if (input.conversationId && !existing) {
     throw new AppError('not_found', 'Conversation not found', 404);
   }
 
   const conversation = existing ?? newConversation(input.channel, input.externalUserId, now);
+  const limited = limitTurn(conversation.session, input.text);
+  if (limited) {
+    return persistTurn(
+      input,
+      conversation,
+      limited.session,
+      limited.reply,
+      'offline',
+      started,
+      now,
+      'limit',
+    );
+  }
+
+  const policy = policyTurn(input.channel, input.text, conversation.session);
+  let session = conversation.session;
+  let text = input.text;
+  let mode: ReplyMode = 'offline';
+  let modelText: string | null = null;
+  if (container.relay && !policy) {
+    try {
+      const history = await container.repo.listMessages(conversation.id);
+      const live = await qualifyWithRelay(container.relay, {
+        text: input.text,
+        slots: conversation.session.slots,
+        history,
+      });
+      session = {
+        ...conversation.session,
+        slots: mergeSlots(conversation.session.slots, live.slots),
+      };
+      if (live.book && !hasBookingIntent(input.text))
+        text = `${input.text}\nBook the earliest slot`;
+      modelText = live.reply;
+    } catch (error) {
+      if (!isRelayFallback(error)) throw error;
+      mode = 'offline_fallback';
+      container.logger.warn('llm.fallback', {
+        requestId: input.requestId,
+        conversationId: conversation.id,
+        reason: error instanceof Error ? error.name : 'Error',
+      });
+    }
+  }
+
   const decision = await handleTurn({
-    session: conversation.session,
-    text: input.text,
+    session,
+    text,
     now,
     calendar: container.calendar,
     listings: LISTINGS,
     timeZone: container.timeZone,
   });
-
-  let reply = decision.reply;
-  let mode: ReplyMode = 'offline';
-  if (decision.allowRephrase && container.model.id === 'openai') {
+  const reply = chooseReply(decision, modelText, input.text, mode, container.timeZone);
+  if (modelText && reply !== decision.reply && mode !== 'offline_fallback') mode = 'relay';
+  if (
+    modelText &&
+    reply === decision.reply &&
+    mode !== 'offline_fallback' &&
+    decision.allowRephrase
+  ) {
+    mode = 'offline_fallback';
+  }
+  if (!container.relay && decision.allowRephrase && container.model.id === 'openai') {
     const facts = replyFacts(decision.reply);
     try {
-      reply = await container.model.rephrase({ draft: decision.reply, facts });
-      mode = 'openai';
+      const rewritten = await container.model.rephrase({ draft: decision.reply, facts });
+      return persistTurn(
+        input,
+        conversation,
+        decision.session,
+        rewritten,
+        'openai',
+        started,
+        now,
+        decision.kind,
+        decision,
+      );
     } catch (error) {
       mode = 'offline_fallback';
       container.logger.warn('llm.fallback', {
@@ -76,8 +151,39 @@ export async function acceptInbound(input: {
     }
   }
 
+  return persistTurn(
+    input,
+    conversation,
+    decision.session,
+    reply,
+    mode,
+    started,
+    now,
+    decision.kind,
+    decision,
+  );
+}
+
+async function persistTurn(
+  input: {
+    channel: Exclude<Channel, 'voice'>;
+    externalMessageId: string;
+    text: string;
+    requestId: string;
+  },
+  conversation: Conversation,
+  session: Session,
+  reply: string,
+  mode: ReplyMode,
+  started: number,
+  now: Date,
+  kind: string,
+  decision?: TurnDecision,
+): Promise<InboundResult> {
+  const container = getContainer();
   const latencyMs = Math.max(0, Math.round(performance.now() - started));
   const createdAt = now.toISOString();
+  const assistantAt = new Date(now.getTime() + 1).toISOString();
   const userMessage: StoredMessage = {
     id: `${input.externalMessageId}:user`,
     conversationId: conversation.id,
@@ -92,13 +198,13 @@ export async function acceptInbound(input: {
     role: 'assistant',
     text: reply,
     channel: input.channel,
-    createdAt,
+    createdAt: assistantAt,
     mode,
     latencyMs,
   };
-  container.repo.addMessage(userMessage);
-  container.repo.addMessage(assistantMessage);
-  container.repo.addLatency({
+  await container.repo.addMessage(userMessage);
+  await container.repo.addMessage(assistantMessage);
+  await container.repo.addLatency({
     id: `${input.externalMessageId}:latency`,
     channel: input.channel,
     conversationId: conversation.id,
@@ -108,13 +214,13 @@ export async function acceptInbound(input: {
 
   const updated: Conversation = {
     ...conversation,
-    session: decision.session,
+    session,
     updatedAt: createdAt,
   };
-  container.repo.upsertConversation(updated);
-  container.repo.upsertLead(toLead(updated, now));
-  for (const appointment of container.calendar.listAppointments()) {
-    container.repo.upsertAppointment(appointment);
+  await container.repo.upsertConversation(updated);
+  await container.repo.upsertLead(toLead(updated, now));
+  for (const appointment of await container.calendar.listAppointments()) {
+    await container.repo.upsertAppointment(appointment);
   }
 
   container.logger.info('turn.completed', {
@@ -123,19 +229,19 @@ export async function acceptInbound(input: {
     conversationId: conversation.id,
     mode,
     latencyMs,
-    kind: decision.kind,
+    kind,
   });
 
-  const appointment = decision.appointment;
+  const appointment = decision?.appointment;
   return {
     reply,
     mode,
     conversationId: conversation.id,
     leadId: updated.leadId,
-    stage: decision.session.stage,
-    slots: decision.session.slots,
-    score: qualificationScore(decision.session.slots),
-    listings: decision.listings.map((listing) => ({
+    stage: session.stage,
+    slots: session.slots,
+    score: qualificationScore(session.slots),
+    listings: (decision?.listings ?? []).map((listing) => ({
       id: listing.id,
       address: listing.address,
       neighborhood: listing.neighborhood,
@@ -150,9 +256,54 @@ export async function acceptInbound(input: {
           label: formatWhen(appointment.start, container.timeZone),
         }
       : null,
-    transcript: container.repo.listMessages(conversation.id),
-    guardrail: decision.guardrail,
+    transcript: await container.repo.listMessages(conversation.id),
+    guardrail: decision?.guardrail,
   };
+}
+
+function limitTurn(session: Session, text: string): { session: Session; reply: string } | null {
+  if (text.length > MAX_MESSAGE_CHARS) {
+    return {
+      reply: tooLongMessage(),
+      session: { ...session, turnCount: session.turnCount + 1 },
+    };
+  }
+  if (session.turnCount >= MAX_TURNS) {
+    return {
+      reply: turnLimitMessage(),
+      session: { ...session, turnCount: session.turnCount + 1, handoff: true, stage: 'handoff' },
+    };
+  }
+  return null;
+}
+
+function policyTurn(channel: Exclude<Channel, 'voice'>, text: string, session: Session): boolean {
+  const trimmed = text.trim();
+  if (channel === 'sms' && (isStopKeyword(trimmed) || session.optedOut)) return true;
+  if (classifyGuardrail(trimmed)) return true;
+  if (wantsHuman(trimmed) || session.handoff) return true;
+  return false;
+}
+
+function chooseReply(
+  decision: TurnDecision,
+  modelText: string | null,
+  userText: string,
+  mode: ReplyMode,
+  timeZone: string,
+): string {
+  if (
+    !modelText ||
+    mode === 'offline_fallback' ||
+    !decision.allowRephrase ||
+    !replyLooksUsable(modelText, userText)
+  ) {
+    return decision.reply;
+  }
+  if (!decision.appointment) return modelText;
+  const label = formatWhen(decision.appointment.start, timeZone);
+  if (modelText.includes(label)) return modelText;
+  return `${modelText.trim()} Tour booked for ${label}.`;
 }
 
 function newConversation(

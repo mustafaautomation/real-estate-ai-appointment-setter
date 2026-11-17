@@ -9,7 +9,9 @@ export const dynamic = 'force-dynamic';
 
 export function GET(request: Request): Promise<Response> {
   return guarded(request, 'metrics', async (requestId) => {
-    const samples = getContainer().repo.listLatencies();
+    const container = getContainer();
+    await container.ready;
+    const samples = await container.repo.listLatencies();
     const measured = channelPercentiles(samples);
     const channels = CHANNELS.filter((channel) => channel !== 'voice').map((channel) => {
       const row = measured[channel];
@@ -23,7 +25,7 @@ export function GET(request: Request): Promise<Response> {
     return json(
       {
         method: 'nearest-rank',
-        scope: 'this-process',
+        scope: container.storage === 'd1' ? 'd1' : 'this-process',
         channels,
         sampleCount: samples.length,
       },

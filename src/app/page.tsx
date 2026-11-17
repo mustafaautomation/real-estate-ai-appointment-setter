@@ -16,16 +16,18 @@ export default function HomePage() {
           <h1>
             Every lead.
             <br />
-            One desk.
+            <em>One desk.</em>
           </h1>
           <p className="lede">
             Instagram, SMS, email, and site chat share one qualification path. Budget, area, beds,
             type, timeline, then a tour.
           </p>
           <p className="fine">
-            {mode === 'openai'
-              ? 'Phrasing can use OpenAI. If a call fails, that reply is marked offline fallback.'
-              : 'Replies on this run are templates. No model is called.'}
+            {mode === 'relay'
+              ? 'Replies come from Llama 3.3 70B on Cloudflare Workers AI. Leads, threads, and tours are stored in Cloudflare D1 and deleted after 30 days. If a call fails, that reply is the offline template.'
+              : mode === 'openai'
+                ? 'Phrasing can use OpenAI. If a call fails, that reply is the offline template.'
+                : 'This process has no LLM_RELAY_URL, so replies are offline templates. When that URL is set, replies come from Llama 3.3 70B on Cloudflare Workers AI and records are stored in Cloudflare D1 for 30 days.'}
           </p>
           <div className="actions">
             <Link className="button" href="/chat">
@@ -36,8 +38,11 @@ export default function HomePage() {
             </Link>
           </div>
           <ul className="status">
-            <li>Storage {container.storage}</li>
-            <li>Calendar {container.calendarName}</li>
+            <li>Storage {container.storage === 'd1' ? 'Cloudflare D1' : container.storage}</li>
+            <li>
+              Calendar{' '}
+              {container.calendarName === 'reserve' ? 'slot reserve' : container.calendarName}
+            </li>
             <li>Voice stub</li>
           </ul>
         </div>

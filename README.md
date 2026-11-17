@@ -4,7 +4,7 @@ Personal demo by Muhammad Mustafa. It is one qualification and appointment desk 
 
 ## What it does
 
-A lead can write through site chat, a Twilio-shaped SMS webhook, an inbound email payload, or an Instagram webhook. All four call the same state machine. The machine collects budget, area, bedrooms, property type, and timeline, suggests two or three matching listings when it has them, and books a weekday tour on a calendar port. Threads are not capped at three messages. The desk refuses fair-housing steering and legal or financial advice, hands the thread to a person when asked, and treats `STOP` on SMS as an opt-out.
+A lead can write through site chat, a Twilio-shaped SMS webhook, an inbound email payload, or an Instagram webhook. All four call the same state machine. The machine collects budget, area, bedrooms, property type, and timeline, suggests two or three matching listings when it has them, and books a weekday tour on a calendar port. Threads are not capped at three messages. An abuse cap stops a thread after 24 turns. The desk refuses fair-housing steering and legal or financial advice, hands the thread to a person when asked, and treats `STOP` on SMS as an opt-out.
 
 Reply latency is `performance.now()` around each turn. The Latency page shows nearest-rank p50 and p95 for samples stored in this process. If a channel has no samples, the cell is an em dash.
 
@@ -31,7 +31,7 @@ flowchart LR
   Repo --> Inbox[Inbox and latency]
 ```
 
-Policy decisions (slots, refusals, booking) stay in code. When `OPENAI_API_KEY` is set, the model may rewrite the wording of an ordinary reply. It is not called for refusals, opt-out, or handoff. If the call fails, the template is sent and that reply is marked offline fallback.
+Policy decisions (refusals, opt-out, handoff, and whether a tour can be booked) stay in code. When `LLM_RELAY_URL` and `LLM_RELAY_TOKEN` are set, ordinary replies and slot extraction use Llama 3.3 70B on Cloudflare Workers AI. Leads, conversations, messages, appointments, and an events log are stored in Cloudflare D1 and deleted after 30 days. Booking claims a slot with the relay reserve endpoint. A 429, 502, timeout (8 seconds), or missing URL uses the offline template for that reply. `OPENAI_API_KEY` is an optional phrasing path used only when the relay URL is empty.
 
 Calendar and storage are ports. The default calendar is in-memory, with an async lock and a compare-and-set on slot state. SQLite is selected with `STORAGE_DRIVER=sqlite`. The SQL is ordinary `INSERT ... ON CONFLICT`, so a Postgres executor can sit behind the same repository interface. Cal.com and Google Calendar adapters exist and stay off unless `CALENDAR_PROVIDER` says otherwise.
 
@@ -57,13 +57,16 @@ Compose uses the SQLite driver and a named volume. The default `npm run dev` pro
 
 ## Modes
 
-| Mode             | When                                            | What a reply is                                                              |
-| ---------------- | ----------------------------------------------- | ---------------------------------------------------------------------------- |
-| Offline          | `OPENAI_API_KEY` is empty                       | Rule-based slot extraction and templates. No model call.                     |
-| OpenAI           | The key is set and the call returns usable text | Same slot and booking decisions. The model rewrites wording.                 |
-| Offline fallback | The key is set and the call times out or fails  | The template from the offline engine. The reply is labeled offline fallback. |
+| Mode             | When                                                       | What a reply is                                                              |
+| ---------------- | ---------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| Relay            | `LLM_RELAY_URL` and `LLM_RELAY_TOKEN` are set              | Llama 3.3 70B extracts slots and writes the reply. Tours are reserved in D1. |
+| Offline          | The relay URL is empty and `OPENAI_API_KEY` is empty       | Rule-based slot extraction and templates.                                    |
+| OpenAI           | The relay URL is empty, the key is set, and the call works | Same slot and booking decisions. The model rewrites wording.                 |
+| Offline fallback | The configured model call returns 429, 502, or times out   | The offline template. The reply is labeled offline fallback.                 |
 
-The header reads `Offline engine` or `OpenAI configured`. A reply badge says `Offline`, `OpenAI`, or `Offline fallback`. The badge is the path that produced that reply.
+The header reads `Llama 3.3 70B`, `Offline templates`, or `OpenAI configured`. A reply badge says `Llama 3.3 70B`, `Offline`, `OpenAI`, or `Offline fallback`. The badge is the path that produced that reply.
+
+Messages longer than 2,000 characters are refused. A conversation stops accepting model turns after 24 turns. The desk rate limit and the relay rate limit both return a short wait message. The relay allows 20 chat requests a minute per visitor IP, and 120 store requests. The server sends that IP in `x-client-ip`.
 
 Offline templates vary by turn count. They are not a single script.
 
@@ -116,6 +119,24 @@ CI runs lint, typecheck, unit and integration coverage, offline evals, build, Pl
 
 Playwright starts `next start`, so build first.
 
+## Interface
+
+Desktop shots are 1440 pixels wide. The mobile shot is 390 pixels wide. Colors follow the system light or dark setting. These shots are the light setting.
+
+![Landing page, desktop](docs/screenshots/landing-desktop.png)
+
+![Chat, desktop](docs/screenshots/chat-desktop.png)
+
+![Inbox, desktop](docs/screenshots/inbox-desktop.png)
+
+![Channel simulator, desktop](docs/screenshots/simulator-desktop.png)
+
+![Latency, desktop](docs/screenshots/latency-desktop.png)
+
+![Voice stub, desktop](docs/screenshots/voice-desktop.png)
+
+![Landing page, mobile](docs/screenshots/landing-mobile.png)
+
 ## Limitations
 
 - Harborline Realty, Cedar Bay, and the 30 listings are fictional.
@@ -125,7 +146,8 @@ Playwright starts `next start`, so build first.
 - Spanish and other-language replies are small template sets, not a translation of the whole desk.
 - Transcripts are stored so the inbox can show them. Logs redact email, phone, and SSN. This is not a privacy program.
 - Qualification score is `16` points per filled required slot plus a timeline weight (`asap` 20, `30_days` 14, `90_days` 8, `6_months` 4, `browsing` 2), capped at 100. It is not a prediction.
-- Latency numbers are only the samples this process recorded.
+- Latency numbers are the samples stored for this process, or the samples in Cloudflare D1 when the relay is configured.
+- D1 records are deleted after 30 days.
 
 ## License
 

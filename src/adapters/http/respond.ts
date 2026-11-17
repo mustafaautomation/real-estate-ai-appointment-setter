@@ -1,5 +1,6 @@
 import { ZodError } from 'zod';
 
+import { RelayHttpError } from '@/adapters/relay/client';
 import { AppError } from '@/domain/errors';
 import { createLogger, type Logger } from '@/adapters/logging/logger';
 
@@ -14,7 +15,9 @@ export function requestIdOf(request: Request): string {
 export function clientKey(request: Request): string {
   const forwarded = request.headers.get('x-forwarded-for');
   const first = forwarded?.split(',')[0]?.trim();
-  return first && first.length > 0 ? first : 'local';
+  if (first) return first;
+  const real = request.headers.get('x-real-ip')?.trim();
+  return real || 'local';
 }
 
 export function json(
@@ -42,6 +45,26 @@ export function errorResponse(error: unknown, requestId: string): Response {
     return json(
       { error: { code: error.code, message: error.message, requestId } },
       error.status,
+      requestId,
+    );
+  }
+  if (error instanceof RelayHttpError) {
+    logger.error('request.failed', {
+      requestId,
+      name: error.name,
+      status: error.status,
+      code: error.code,
+      path: error.path,
+    });
+    return json(
+      {
+        error: {
+          code: 'relay_error',
+          message: `The relay returned ${error.status} ${error.code} for ${error.path || 'a request'}.`,
+          requestId,
+        },
+      },
+      502,
       requestId,
     );
   }

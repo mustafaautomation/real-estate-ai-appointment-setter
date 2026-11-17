@@ -130,15 +130,24 @@ export function SimulatorPanel() {
               <p data-testid="simulator-reply">{result.reply}</p>
               {result.mode ? (
                 <p className="mode-note" data-testid="simulator-mode">
-                  {result.mode === 'openai'
-                    ? 'OpenAI'
-                    : result.mode === 'offline_fallback'
-                      ? 'Offline fallback'
-                      : 'Offline'}
+                  {result.mode === 'relay'
+                    ? 'Llama 3.3 70B'
+                    : result.mode === 'openai'
+                      ? 'OpenAI'
+                      : result.mode === 'offline_fallback'
+                        ? 'Offline fallback'
+                        : 'Offline'}
+                </p>
+              ) : null}
+              {result.mode === 'offline_fallback' ? (
+                <p className="fallback-note" data-testid="fallback-note">
+                  The model did not answer this turn. This reply is the offline template.
                 </p>
               ) : null}
               {result.appointment?.label ? (
-                <p data-testid="simulator-booked">Booked {result.appointment.label}</p>
+                <p className="booked-note" data-testid="simulator-booked">
+                  Booked {result.appointment.label}
+                </p>
               ) : null}
             </>
           ) : (
