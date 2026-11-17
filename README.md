@@ -116,6 +116,24 @@ CI runs lint, typecheck, unit and integration coverage, offline evals, build, Pl
 
 Playwright starts `next start`, so build first.
 
+## Interface
+
+Desktop shots are 1440 pixels wide. The mobile shot is 390 pixels wide. Colors follow the system light or dark setting. These shots are the light setting.
+
+![Landing page, desktop](docs/screenshots/landing-desktop.png)
+
+![Chat, desktop](docs/screenshots/chat-desktop.png)
+
+![Inbox, desktop](docs/screenshots/inbox-desktop.png)
+
+![Channel simulator, desktop](docs/screenshots/simulator-desktop.png)
+
+![Latency, desktop](docs/screenshots/latency-desktop.png)
+
+![Voice stub, desktop](docs/screenshots/voice-desktop.png)
+
+![Landing page, mobile](docs/screenshots/landing-mobile.png)
+
 ## Limitations
 
 - Harborline Realty, Cedar Bay, and the 30 listings are fictional.

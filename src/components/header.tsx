@@ -17,12 +17,11 @@ export function Header({ mode }: { mode: 'offline' | 'openai' }) {
   return (
     <header className="topbar">
       <Link href="/" className="wordmark">
+        <span className="brand-mark" aria-hidden="true">
+          H
+        </span>
         Harborline
       </Link>
-      <p className="mode-badge" data-testid="llm-mode" data-mode={mode}>
-        <span aria-hidden="true" />
-        {mode === 'openai' ? 'OpenAI configured' : 'Offline engine'}
-      </p>
       <nav aria-label="Primary">
         {LINKS.map((link) => {
           const active = pathname === link.href;
@@ -33,6 +32,10 @@ export function Header({ mode }: { mode: 'offline' | 'openai' }) {
           );
         })}
       </nav>
+      <p className="mode-badge" data-testid="llm-mode" data-mode={mode}>
+        <span aria-hidden="true" />
+        {mode === 'openai' ? 'OpenAI configured' : 'Offline engine'}
+      </p>
     </header>
   );
 }

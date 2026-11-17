@@ -66,11 +66,16 @@ export function Inbox({ leads, week, kpis }: { leads: InboxCard[]; week: WeekDay
             {STAGES.map((stage) => {
               const cards = leads.filter((lead) => lead.stage === stage.id);
               return (
-                <section key={stage.id} className="lane" aria-label={stage.label}>
+                <section
+                  key={stage.id}
+                  className={`lane lane-${stage.id}`}
+                  aria-label={stage.label}
+                >
                   <header>
                     <h2>{stage.label}</h2>
                     <span>{cards.length}</span>
                   </header>
+                  {cards.length === 0 ? <p className="lane-empty">No leads</p> : null}
                   {cards.map((card) => (
                     <button
                       key={card.id}
@@ -154,17 +159,19 @@ function cardMeta(card: InboxCard): string {
 function Spark({ points }: { points: number[] }) {
   const max = Math.max(1, ...points);
   const width = 120;
-  const height = 28;
+  const height = 36;
+  const pad = 4;
   const step = points.length > 1 ? width / (points.length - 1) : width;
   const d = points
     .map((point, index) => {
       const x = index * step;
-      const y = height - (point / max) * (height - 2) - 1;
+      const y = pad + (1 - point / max) * (height - pad * 2);
       return `${index === 0 ? 'M' : 'L'}${x.toFixed(1)} ${y.toFixed(1)}`;
     })
     .join(' ');
   return (
     <svg className="spark" viewBox={`0 0 ${width} ${height}`} aria-hidden="true">
+      <line className="spark-base" x1="0" y1={height - 1} x2={width} y2={height - 1} />
       <path d={d} />
     </svg>
   );

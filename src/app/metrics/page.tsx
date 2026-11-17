@@ -2,6 +2,14 @@ import { channelPercentiles } from '@/domain/metrics/percentile';
 import { CHANNELS } from '@/domain/types';
 import { getContainer } from '@/server/container';
 
+const CHANNEL_LABEL = {
+  web: 'Site chat',
+  sms: 'SMS',
+  email: 'Email',
+  instagram: 'Instagram',
+  voice: 'Voice',
+} as const;
+
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Latency' };
 
@@ -10,7 +18,13 @@ export default function MetricsPage() {
   const measured = channelPercentiles(samples);
   const rows = CHANNELS.filter((channel) => channel !== 'voice').map((channel) => {
     const row = measured[channel];
-    return { channel, count: row?.count ?? 0, p50: row?.p50 ?? null, p95: row?.p95 ?? null };
+    return {
+      channel,
+      label: CHANNEL_LABEL[channel],
+      count: row?.count ?? 0,
+      p50: row?.p50 ?? null,
+      p95: row?.p95 ?? null,
+    };
   });
   const bins = histogram(samples.map((sample) => sample.latencyMs));
   const peak = Math.max(1, ...bins.map((bin) => bin.count));
@@ -41,26 +55,31 @@ export default function MetricsPage() {
             </div>
           </figure>
         )}
-        <div className="metric-table">
-          <div className="metric-head">
-            <span>Channel</span>
-            <span>Samples</span>
-            <span>p50 ms</span>
-            <span>p95 ms</span>
-          </div>
-          {rows.map((row) => (
-            <div className="metric-row" key={row.channel} data-testid={`metric-${row.channel}`}>
-              <span>{row.channel}</span>
-              <span>{row.count}</span>
-              <span data-testid={`metric-p50-${row.channel}`}>
-                {row.p50 === null ? '—' : row.p50}
-              </span>
-              <span data-testid={`metric-p95-${row.channel}`}>
-                {row.p95 === null ? '—' : row.p95}
-              </span>
-            </div>
-          ))}
-        </div>
+        <table className="metric-table">
+          <caption className="sr-only">Reply latency by channel, this process only.</caption>
+          <thead>
+            <tr>
+              <th scope="col">Channel</th>
+              <th scope="col">Samples</th>
+              <th scope="col">p50 ms</th>
+              <th scope="col">p95 ms</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.channel} data-testid={`metric-${row.channel}`}>
+                <th scope="row">{row.label}</th>
+                <td>{row.count}</td>
+                <td data-testid={`metric-p50-${row.channel}`}>
+                  {row.p50 === null ? '—' : row.p50}
+                </td>
+                <td data-testid={`metric-p95-${row.channel}`}>
+                  {row.p95 === null ? '—' : row.p95}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </section>
       <aside className="metric-side">
         <article className="panel">

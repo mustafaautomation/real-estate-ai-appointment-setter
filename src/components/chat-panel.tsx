@@ -204,44 +204,46 @@ export function ChatPanel() {
             </article>
           ) : null}
         </div>
-        {error ? (
-          <p className="form-error" role="alert" data-testid="chat-error">
-            {error}
-          </p>
-        ) : null}
-        <div className="chips">
-          {chipsFor(slots, Boolean(appointment)).map((chip) => (
-            <button key={chip.label} type="button" onClick={() => void submit(chip.text)}>
-              {chip.label}
-            </button>
-          ))}
-        </div>
-        <form onSubmit={onSubmit} aria-busy={pending}>
-          <label htmlFor="chat-text">Message</label>
-          <div className="composer">
-            <textarea
-              id="chat-text"
-              data-testid="chat-input"
-              value={text}
-              rows={2}
-              maxLength={4000}
-              onChange={(event) => setText(event.target.value)}
-              onKeyDown={(event: KeyboardEvent<HTMLTextAreaElement>) => {
-                if (event.key === 'Enter' && !event.shiftKey) {
-                  event.preventDefault();
-                  event.currentTarget.form?.requestSubmit();
-                }
-              }}
-            />
-            <button
-              type="submit"
-              data-testid="chat-send"
-              disabled={pending || text.trim().length === 0}
-            >
-              {pending ? 'Sending' : 'Send'}
-            </button>
+        <div className="thread-foot">
+          {error ? (
+            <p className="form-error" role="alert" data-testid="chat-error">
+              {error}
+            </p>
+          ) : null}
+          <div className="chips">
+            {chipsFor(slots, Boolean(appointment)).map((chip) => (
+              <button key={chip.label} type="button" onClick={() => void submit(chip.text)}>
+                {chip.label}
+              </button>
+            ))}
           </div>
-        </form>
+          <form onSubmit={onSubmit} aria-busy={pending}>
+            <label htmlFor="chat-text">Message</label>
+            <div className="composer">
+              <textarea
+                id="chat-text"
+                data-testid="chat-input"
+                value={text}
+                rows={2}
+                maxLength={4000}
+                onChange={(event) => setText(event.target.value)}
+                onKeyDown={(event: KeyboardEvent<HTMLTextAreaElement>) => {
+                  if (event.key === 'Enter' && !event.shiftKey) {
+                    event.preventDefault();
+                    event.currentTarget.form?.requestSubmit();
+                  }
+                }}
+              />
+              <button
+                type="submit"
+                data-testid="chat-send"
+                disabled={pending || text.trim().length === 0}
+              >
+                {pending ? 'Sending' : 'Send'}
+              </button>
+            </div>
+          </form>
+        </div>
       </section>
       <aside className="qualify" aria-label="Qualification">
         <div className="qualify-head">

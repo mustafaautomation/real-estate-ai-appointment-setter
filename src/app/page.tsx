@@ -16,7 +16,7 @@ export default function HomePage() {
           <h1>
             Every lead.
             <br />
-            One desk.
+            <em>One desk.</em>
           </h1>
           <p className="lede">
             Instagram, SMS, email, and site chat share one qualification path. Budget, area, beds,

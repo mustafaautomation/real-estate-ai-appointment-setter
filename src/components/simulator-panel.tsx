@@ -138,7 +138,9 @@ export function SimulatorPanel() {
                 </p>
               ) : null}
               {result.appointment?.label ? (
-                <p data-testid="simulator-booked">Booked {result.appointment.label}</p>
+                <p className="booked-note" data-testid="simulator-booked">
+                  Booked {result.appointment.label}
+                </p>
               ) : null}
             </>
           ) : (
