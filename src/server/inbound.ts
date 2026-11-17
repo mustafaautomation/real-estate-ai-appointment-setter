@@ -183,6 +183,7 @@ async function persistTurn(
   const container = getContainer();
   const latencyMs = Math.max(0, Math.round(performance.now() - started));
   const createdAt = now.toISOString();
+  const assistantAt = new Date(now.getTime() + 1).toISOString();
   const userMessage: StoredMessage = {
     id: `${input.externalMessageId}:user`,
     conversationId: conversation.id,
@@ -197,7 +198,7 @@ async function persistTurn(
     role: 'assistant',
     text: reply,
     channel: input.channel,
-    createdAt,
+    createdAt: assistantAt,
     mode,
     latencyMs,
   };

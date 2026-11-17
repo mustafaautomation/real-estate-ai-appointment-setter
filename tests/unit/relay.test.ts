@@ -101,9 +101,9 @@ describe('reserve calendar', () => {
       SlotTakenError,
     );
     const firstBody = JSON.parse(String(fetchImpl.mock.calls[0]?.[1]?.body)) as {
-      data: { slot_key: string };
+      slot_key: string;
     };
-    expect(firstBody.data.slot_key).toBe(slot?.id);
+    expect(firstBody.slot_key).toBe(slot?.id);
   });
 });
 

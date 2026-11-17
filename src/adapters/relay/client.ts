@@ -186,7 +186,7 @@ export class RelayClient {
   async reserve(id: string, data: { slot_key: string } & Record<string, unknown>): Promise<void> {
     const response = await this.send(`/v1/store/appointments/${storeId(id)}/reserve`, {
       method: 'POST',
-      body: { data },
+      body: data,
     });
     const payload: unknown = await readJson(response);
     if (response.status === 409 || errorCode(payload, response.status) === 'slot_taken') {
