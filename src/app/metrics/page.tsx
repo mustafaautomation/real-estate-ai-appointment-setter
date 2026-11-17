@@ -1,6 +1,9 @@
+import { headers } from 'next/headers';
+
 import { channelPercentiles } from '@/domain/metrics/percentile';
 import { CHANNELS } from '@/domain/types';
 import { getContainer } from '@/server/container';
+import { runWithClientIp } from '@/server/request-context';
 
 const CHANNEL_LABEL = {
   web: 'Site chat',
@@ -13,8 +16,21 @@ const CHANNEL_LABEL = {
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Latency' };
 
-export default function MetricsPage() {
-  const samples = getContainer().repo.listLatencies();
+export default async function MetricsPage() {
+  const headerList = await headers();
+  return runWithClientIp(visitorIp(headerList), () => loadMetrics());
+}
+
+function visitorIp(headerList: { get(name: string): string | null }): string {
+  const forwarded = headerList.get('x-forwarded-for');
+  const first = forwarded?.split(',')[0]?.trim();
+  return first || headerList.get('x-real-ip')?.trim() || 'local';
+}
+
+async function loadMetrics() {
+  const container = getContainer();
+  await container.ready;
+  const samples = await container.repo.listLatencies();
   const measured = channelPercentiles(samples);
   const rows = CHANNELS.filter((channel) => channel !== 'voice').map((channel) => {
     const row = measured[channel];
@@ -34,13 +50,16 @@ export default function MetricsPage() {
         <div className="section-label">
           <h1>Latency</h1>
           <p>
-            Nearest-rank p50 and p95 for replies measured in this process. Empty cells are not
-            zeros.
+            {container.storage === 'd1'
+              ? 'Nearest-rank p50 and p95 for replies stored in Cloudflare D1. Empty cells are not zeros.'
+              : 'Nearest-rank p50 and p95 for replies measured in this process. Empty cells are not zeros.'}
           </p>
         </div>
         {samples.length === 0 ? (
           <p className="empty" data-testid="metrics-empty">
-            No replies measured in this process yet.
+            {container.storage === 'd1'
+              ? 'No replies stored yet.'
+              : 'No replies measured in this process yet.'}
           </p>
         ) : (
           <figure className="hist">

@@ -76,7 +76,9 @@ export type Appointment = {
 
 export type Language = 'en' | 'es' | 'other';
 
-export type ReplyMode = 'offline' | 'openai' | 'offline_fallback';
+export type ReplyMode = 'offline' | 'openai' | 'relay' | 'offline_fallback';
+
+export type Awaitable<T> = T | Promise<T>;
 
 export type GuardrailKind = 'fair_housing' | 'legal' | 'financial';
 
@@ -156,27 +158,27 @@ export type SchedulePreference =
 export interface CalendarPort {
   listOpen(now: Date): Promise<TimeSlot[]>;
   book(slotId: string, leadId: string, conversationId: string): Promise<Appointment>;
-  release(appointmentId: string): void;
-  getAppointment(id: string): Appointment | null;
-  listAppointments(): Appointment[];
+  release(appointmentId: string): Awaitable<void>;
+  getAppointment(id: string): Awaitable<Appointment | null>;
+  listAppointments(): Awaitable<Appointment[]>;
 }
 
 export interface LeadRepository {
-  upsertLead(lead: Lead): void;
-  getLead(id: string): Lead | null;
-  listLeads(): Lead[];
-  upsertConversation(conversation: Conversation): void;
-  getConversation(id: string): Conversation | null;
-  findConversation(channel: Channel, externalUserId: string): Conversation | null;
-  addMessage(message: StoredMessage): void;
-  listMessages(conversationId: string): StoredMessage[];
-  upsertAppointment(appointment: Appointment): void;
-  listAppointments(): Appointment[];
-  getIdempotency(key: string): IdempotencyRecord | null;
-  /** Synchronous claim. Returns the existing row, or null when this caller owns a new pending row. */
-  claimIdempotency(record: IdempotencyRecord): IdempotencyRecord | null;
-  saveIdempotency(record: IdempotencyRecord): void;
-  deleteIdempotency(key: string): void;
-  addLatency(sample: LatencySample): void;
-  listLatencies(): LatencySample[];
+  upsertLead(lead: Lead): Awaitable<void>;
+  getLead(id: string): Awaitable<Lead | null>;
+  listLeads(): Awaitable<Lead[]>;
+  upsertConversation(conversation: Conversation): Awaitable<void>;
+  getConversation(id: string): Awaitable<Conversation | null>;
+  findConversation(channel: Channel, externalUserId: string): Awaitable<Conversation | null>;
+  addMessage(message: StoredMessage): Awaitable<void>;
+  listMessages(conversationId: string): Awaitable<StoredMessage[]>;
+  upsertAppointment(appointment: Appointment): Awaitable<void>;
+  listAppointments(): Awaitable<Appointment[]>;
+  getIdempotency(key: string): Awaitable<IdempotencyRecord | null>;
+  /** Returns the existing row, or null when this caller owns a new pending row. */
+  claimIdempotency(record: IdempotencyRecord): Awaitable<IdempotencyRecord | null>;
+  saveIdempotency(record: IdempotencyRecord): Awaitable<void>;
+  deleteIdempotency(key: string): Awaitable<void>;
+  addLatency(sample: LatencySample): Awaitable<void>;
+  listLatencies(): Awaitable<LatencySample[]>;
 }

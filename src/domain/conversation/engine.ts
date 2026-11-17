@@ -99,7 +99,7 @@ export async function handleTurn(input: {
 
   if (booking && session.appointmentId && !reschedule) {
     session.stage = 'booked';
-    const existing = input.calendar.getAppointment(session.appointmentId) ?? undefined;
+    const existing = (await input.calendar.getAppointment(session.appointmentId)) ?? undefined;
     const listings = matched(input.listings, session);
     return decide(session, 'booked', input, {
       allowRephrase: true,
@@ -154,7 +154,7 @@ async function bookFromText(
   const preference = interpretSchedule(text);
   const open = await input.calendar.listOpen(input.now);
   const current = session.appointmentId
-    ? input.calendar.getAppointment(session.appointmentId)
+    ? await input.calendar.getAppointment(session.appointmentId)
     : null;
   const after = reschedule && current ? current.start : undefined;
 
@@ -194,7 +194,7 @@ async function bookFromText(
     });
   }
 
-  if (current && current.status === 'booked') input.calendar.release(current.id);
+  if (current && current.status === 'booked') await input.calendar.release(current.id);
   session.appointmentId = appointment.id;
   session.stage = 'booked';
   const listings = matched(input.listings, session);

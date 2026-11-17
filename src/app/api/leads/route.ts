@@ -9,9 +9,13 @@ export const dynamic = 'force-dynamic';
 export function GET(request: Request): Promise<Response> {
   return guarded(request, 'leads', async (requestId) => {
     const container = getContainer();
+    await container.ready;
+    const leads = await container.repo.listLeads();
+    const appointments = await container.repo.listAppointments();
+    const samples = await container.repo.listLatencies();
     return json(
       {
-        leads: container.repo.listLeads().map((lead) => ({
+        leads: leads.map((lead) => ({
           id: lead.id,
           channel: lead.channel,
           score: lead.score,
@@ -21,8 +25,8 @@ export function GET(request: Request): Promise<Response> {
           conversationId: lead.conversationId,
           updatedAt: lead.updatedAt,
         })),
-        appointments: container.repo.listAppointments(),
-        metrics: channelPercentiles(container.repo.listLatencies()),
+        appointments,
+        metrics: channelPercentiles(samples),
       },
       200,
       requestId,

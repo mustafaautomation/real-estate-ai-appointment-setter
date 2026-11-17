@@ -47,7 +47,7 @@ describe('conversation engine', () => {
     expect(turns[2]?.appointment?.id).toBe('appt-1');
     expect(turns[3]?.appointment?.id).toBe('appt-2');
     expect(session.appointmentId).toBe('appt-2');
-    const booked = calendar.listAppointments().filter((item) => item.status === 'booked');
+    const booked = (await calendar.listAppointments()).filter((item) => item.status === 'booked');
     expect(booked).toHaveLength(1);
   });
 

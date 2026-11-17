@@ -12,7 +12,7 @@ const LINKS = [
   { href: '/voice', label: 'Voice' },
 ] as const;
 
-export function Header({ mode }: { mode: 'offline' | 'openai' }) {
+export function Header({ mode }: { mode: 'offline' | 'openai' | 'relay' }) {
   const pathname = usePathname();
   return (
     <header className="topbar">
@@ -34,7 +34,11 @@ export function Header({ mode }: { mode: 'offline' | 'openai' }) {
       </nav>
       <p className="mode-badge" data-testid="llm-mode" data-mode={mode}>
         <span aria-hidden="true" />
-        {mode === 'openai' ? 'OpenAI configured' : 'Offline engine'}
+        {mode === 'relay'
+          ? 'Llama 3.3 70B'
+          : mode === 'openai'
+            ? 'OpenAI configured'
+            : 'Offline templates'}
       </p>
     </header>
   );

@@ -2,6 +2,9 @@ import { CalComCalendar } from '@/adapters/calendar/calcom';
 import { GoogleCalendar } from '@/adapters/calendar/google';
 import { createLogger, type Logger } from '@/adapters/logging/logger';
 import { createReplyModel, type ReplyModel } from '@/adapters/llm/model';
+import { createRelayClient, type RelayClient } from '@/adapters/relay/client';
+import { ReserveCalendar } from '@/adapters/relay/reserve-calendar';
+import { RelayRepository } from '@/adapters/relay/store-repository';
 import { MemoryRepository } from '@/adapters/storage/memory';
 import { SqlRepository } from '@/adapters/storage/sql-repository';
 import { SqliteExecutor } from '@/adapters/storage/sqlite';
@@ -18,8 +21,9 @@ export type Container = {
   model: ReplyModel;
   logger: Logger;
   timeZone: string;
-  storage: 'memory' | 'sqlite';
-  calendarName: 'memory' | 'calcom' | 'google';
+  storage: 'memory' | 'sqlite' | 'd1';
+  calendarName: 'memory' | 'calcom' | 'google' | 'reserve';
+  relay: RelayClient | null;
   ready: Promise<void>;
 };
 
@@ -39,13 +43,17 @@ export function resetContainer(): void {
 
 export function createContainer(): Container {
   const timeZone = brokerageTimeZone();
-  const storage = storageDriver();
-  const repo =
-    storage === 'sqlite'
+  const relay = createRelayClient();
+  const storage = relay ? 'd1' : storageDriver();
+  const repo = relay
+    ? new RelayRepository(relay)
+    : storage === 'sqlite'
       ? new SqlRepository(new SqliteExecutor(databasePath()))
       : new MemoryRepository();
-  const calendarName = calendarProvider();
-  const calendar = createCalendar(calendarName, repo, timeZone);
+  const calendarName = relay ? 'reserve' : calendarProvider();
+  const calendar = relay
+    ? new ReserveCalendar(relay, timeZone)
+    : createCalendar(calendarName, timeZone);
   const container: Container = {
     repo,
     calendar,
@@ -54,21 +62,30 @@ export function createContainer(): Container {
     timeZone,
     storage,
     calendarName,
+    relay,
     ready: Promise.resolve(),
   };
-  if (
+  const seed =
+    !relay &&
     process.env.NODE_ENV !== 'test' &&
     process.env.SEED_DEMO !== '0' &&
-    calendarName === 'memory'
-  ) {
-    container.ready = seedDemo(container);
-  }
+    calendarName === 'memory';
+  container.ready = prepare(container, calendar, seed);
   return container;
 }
 
+async function prepare(container: Container, calendar: CalendarPort, seed: boolean): Promise<void> {
+  if (calendar instanceof MemoryCalendar) {
+    const appointments = await container.repo.listAppointments();
+    for (const appointment of appointments) {
+      if (appointment.status === 'booked') calendar.markBooked(appointment);
+    }
+  }
+  if (seed) await seedDemo(container);
+}
+
 function createCalendar(
-  provider: 'memory' | 'calcom' | 'google',
-  repo: LeadRepository,
+  provider: 'memory' | 'calcom' | 'google' | 'reserve',
   timeZone: string,
 ): CalendarPort {
   if (provider === 'calcom') {
@@ -86,9 +103,5 @@ function createCalendar(
       timeZone,
     });
   }
-  const calendar = new MemoryCalendar(new Date(), timeZone);
-  for (const appointment of repo.listAppointments()) {
-    if (appointment.status === 'booked') calendar.markBooked(appointment);
-  }
-  return calendar;
+  return new MemoryCalendar(new Date(), timeZone);
 }

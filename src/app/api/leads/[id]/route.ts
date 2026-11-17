@@ -13,8 +13,10 @@ export function GET(
   return guarded(request, 'leads', async (requestId) => {
     const { id } = await context.params;
     const container = getContainer();
-    const lead = container.repo.getLead(id);
+    await container.ready;
+    const lead = await container.repo.getLead(id);
     if (!lead) throw new AppError('not_found', 'Lead not found', 404);
+    const transcript = await container.repo.listMessages(lead.conversationId);
     return json(
       {
         lead: {
@@ -27,7 +29,7 @@ export function GET(
           conversationId: lead.conversationId,
           updatedAt: lead.updatedAt,
         },
-        transcript: container.repo.listMessages(lead.conversationId).map((message) => ({
+        transcript: transcript.map((message) => ({
           id: message.id,
           role: message.role,
           text: message.text,

@@ -88,7 +88,10 @@ export function createReplyModel(env: NodeJS.ProcessEnv = process.env): ReplyMod
   );
 }
 
-export function configuredLlmMode(env: NodeJS.ProcessEnv = process.env): 'offline' | 'openai' {
+export function configuredLlmMode(
+  env: NodeJS.ProcessEnv = process.env,
+): 'offline' | 'openai' | 'relay' {
+  if (env.LLM_RELAY_URL?.trim() && env.LLM_RELAY_TOKEN?.trim()) return 'relay';
   return env.OPENAI_API_KEY ? 'openai' : 'offline';
 }
 

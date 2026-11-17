@@ -1,3 +1,4 @@
+import { configuredLlmMode } from '@/adapters/llm/model';
 import { ChatPanel } from '@/components/chat-panel';
 
 export const metadata = { title: 'Chat' };
@@ -5,7 +6,7 @@ export const metadata = { title: 'Chat' };
 export default function ChatPage() {
   return (
     <main className="page">
-      <ChatPanel />
+      <ChatPanel initialMode={configuredLlmMode()} />
     </main>
   );
 }

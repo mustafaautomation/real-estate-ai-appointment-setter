@@ -14,7 +14,9 @@ export function requestIdOf(request: Request): string {
 export function clientKey(request: Request): string {
   const forwarded = request.headers.get('x-forwarded-for');
   const first = forwarded?.split(',')[0]?.trim();
-  return first && first.length > 0 ? first : 'local';
+  if (first) return first;
+  const real = request.headers.get('x-real-ip')?.trim();
+  return real || 'local';
 }
 
 export function json(

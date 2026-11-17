@@ -125,9 +125,8 @@ describe('HTTP routes', () => {
       smsRequest('Looking for a 2 bedroom condo in Glassmarket around 500k, just looking', 'SM-ok'),
     );
     expect(again.headers.get('idempotent-replay')).toBe('true');
-    expect(
-      getContainer().repo.listMessages(getContainer().repo.listLeads()[0]?.conversationId ?? ''),
-    ).toHaveLength(2);
+    const leads = await getContainer().repo.listLeads();
+    expect(await getContainer().repo.listMessages(leads[0]?.conversationId ?? '')).toHaveLength(2);
     process.env.RATE_LIMIT_MAX = '1';
     const limited = await smsPost(smsRequest('Another note from a lead', 'SM-limit'));
     expect(limited.status).toBe(429);
@@ -196,7 +195,7 @@ describe('HTTP routes', () => {
       }),
     );
     expect(invalid.status).toBe(400);
-    const before = getContainer().repo.listAppointments().length;
+    const before = (await getContainer().repo.listAppointments()).length;
     const voice = await voicePost(
       new Request('http://127.0.0.1:3000/api/webhooks/voice', {
         method: 'POST',
@@ -210,7 +209,7 @@ describe('HTTP routes', () => {
     const voiceBody = (await voice.json()) as { live: boolean; executed: boolean };
     expect(voiceBody.live).toBe(false);
     expect(voiceBody.executed).toBe(false);
-    expect(getContainer().repo.listAppointments()).toHaveLength(before);
+    expect(await getContainer().repo.listAppointments()).toHaveLength(before);
     const voiceInfo = await voiceGet(new Request('http://127.0.0.1:3000/api/webhooks/voice'));
     expect((await voiceInfo.json()) as { live: boolean }).toMatchObject({ live: false });
   });

@@ -132,7 +132,7 @@ const PROFILES: readonly Profile[] = [
 ];
 
 export async function seedDemo(container: Container): Promise<void> {
-  if (container.repo.listLeads().length > 0) return;
+  if ((await container.repo.listLeads()).length > 0) return;
   const now = new Date();
   const open = await container.calendar.listOpen(now);
   let slotCursor = 0;
@@ -155,7 +155,7 @@ export async function seedDemo(container: Container): Promise<void> {
     session.turnCount = profile.stage === 'new' ? 0 : 2;
     session.handoff = profile.stage === 'handoff';
     session.optedOut = profile.stage === 'opted_out';
-    container.repo.upsertConversation({
+    await container.repo.upsertConversation({
       id: conversationId,
       leadId,
       channel: profile.channel,
@@ -164,7 +164,7 @@ export async function seedDemo(container: Container): Promise<void> {
       createdAt: created,
       updatedAt: created,
     });
-    container.repo.upsertLead({
+    await container.repo.upsertLead({
       id: leadId,
       channel: profile.channel,
       externalUserId: `synthetic:${profile.key}`,
@@ -175,7 +175,7 @@ export async function seedDemo(container: Container): Promise<void> {
       createdAt: created,
       updatedAt: created,
     });
-    container.repo.addMessage({
+    await container.repo.addMessage({
       id: `synthetic-msg-${profile.key}-user`,
       conversationId,
       role: 'user',
@@ -184,7 +184,7 @@ export async function seedDemo(container: Container): Promise<void> {
       createdAt: created,
     });
     if (profile.stage !== 'new') {
-      container.repo.addMessage({
+      await container.repo.addMessage({
         id: `synthetic-msg-${profile.key}-desk`,
         conversationId,
         role: 'assistant',
@@ -207,16 +207,16 @@ export async function seedDemo(container: Container): Promise<void> {
     const leadId = `synthetic-lead-${profile.key}`;
     const conversationId = `synthetic-conversation-${profile.key}`;
     const appointment = await container.calendar.book(slot.id, leadId, conversationId);
-    container.repo.upsertAppointment(appointment);
-    const lead = container.repo.getLead(leadId);
-    const conversation = container.repo.getConversation(conversationId);
+    await container.repo.upsertAppointment(appointment);
+    const lead = await container.repo.getLead(leadId);
+    const conversation = await container.repo.getConversation(conversationId);
     if (lead) {
       lead.appointmentId = appointment.id;
-      container.repo.upsertLead(lead);
+      await container.repo.upsertLead(lead);
     }
     if (conversation) {
       conversation.session.appointmentId = appointment.id;
-      container.repo.upsertConversation(conversation);
+      await container.repo.upsertConversation(conversation);
     }
   }
 }

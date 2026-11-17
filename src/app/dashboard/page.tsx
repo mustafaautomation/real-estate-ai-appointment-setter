@@ -1,36 +1,49 @@
+import { headers } from 'next/headers';
+
 import { addCivilDays, zonedParts } from '@/domain/booking/time';
 import { propertyLabel } from '@/domain/qualification/slots';
 import type { Lead, Slots } from '@/domain/types';
 import { Inbox, type InboxCard, type Kpi, type WeekDay } from '@/components/inbox';
 import { getContainer } from '@/server/container';
+import { runWithClientIp } from '@/server/request-context';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Inbox' };
 
 export default async function DashboardPage() {
+  const headerList = await headers();
+  return runWithClientIp(visitorIp(headerList), () => loadDashboard());
+}
+
+async function loadDashboard() {
   const container = getContainer();
   await container.ready;
-  const leads = container.repo.listLeads();
-  const tours = container.repo
-    .listAppointments()
-    .filter((appointment) => appointment.status === 'booked');
-  const cards: InboxCard[] = leads.map((lead) => ({
-    id: lead.id,
-    synthetic: lead.externalUserId.startsWith('synthetic:'),
-    channel: lead.channel,
-    stage: lead.stage,
-    score: lead.score,
-    label: cardLabel(lead),
-    budget: budgetLabel(lead.slots),
-    area: lead.slots.area ?? '',
-    preview: previewFor(container.repo.listMessages(lead.conversationId)),
-    transcript: container.repo.listMessages(lead.conversationId).map((message) => ({
-      id: message.id,
-      role: message.role,
-      text: message.text,
-      createdAt: message.createdAt,
-    })),
-  }));
+  const leads = await container.repo.listLeads();
+  const tours = (await container.repo.listAppointments()).filter(
+    (appointment) => appointment.status === 'booked',
+  );
+  const cards: InboxCard[] = await Promise.all(
+    leads.map(async (lead) => {
+      const messages = await container.repo.listMessages(lead.conversationId);
+      return {
+        id: lead.id,
+        synthetic: lead.externalUserId.startsWith('synthetic:'),
+        channel: lead.channel,
+        stage: lead.stage,
+        score: lead.score,
+        label: cardLabel(lead),
+        budget: budgetLabel(lead.slots),
+        area: lead.slots.area ?? '',
+        preview: previewFor(messages),
+        transcript: messages.map((message) => ({
+          id: message.id,
+          role: message.role,
+          text: message.text,
+          createdAt: message.createdAt,
+        })),
+      };
+    }),
+  );
   const week = buildWeek(container.timeZone, tours, leads);
   const kpis = buildKpis(leads, tours, container.timeZone);
   return (
@@ -38,13 +51,20 @@ export default async function DashboardPage() {
       <div className="section-label">
         <h1>Inbox</h1>
         <p>
-          Synthetic seed plus anyone who writes in during this process. Scores come from filled
-          slots.
+          {container.storage === 'd1'
+            ? 'Leads stored in Cloudflare D1. Scores come from filled slots. Records are deleted after 30 days.'
+            : 'Synthetic seed plus anyone who writes in during this process. Scores come from filled slots.'}
         </p>
       </div>
       <Inbox leads={cards} week={week} kpis={kpis} />
     </main>
   );
+}
+
+function visitorIp(headerList: { get(name: string): string | null }): string {
+  const forwarded = headerList.get('x-forwarded-for');
+  const first = forwarded?.split(',')[0]?.trim();
+  return first || headerList.get('x-real-ip')?.trim() || 'local';
 }
 
 function cardLabel(lead: Lead): string {

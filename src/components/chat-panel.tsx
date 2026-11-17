@@ -31,7 +31,7 @@ type TranscriptItem = {
 
 type ChatResponse = {
   reply: string;
-  mode: 'offline' | 'openai' | 'offline_fallback';
+  mode: 'offline' | 'openai' | 'relay' | 'offline_fallback';
   conversationId: string;
   slots: SlotState;
   score: number;
@@ -49,7 +49,11 @@ const FIELDS = [
   ['timeline', 'Timeline'],
 ] as const;
 
-export function ChatPanel() {
+export function ChatPanel({
+  initialMode = 'offline',
+}: {
+  initialMode?: 'offline' | 'openai' | 'relay';
+}) {
   const [text, setText] = useState('');
   const [conversationId, setConversationId] = useState<string | undefined>();
   const [transcript, setTranscript] = useState<TranscriptItem[]>([]);
@@ -58,7 +62,9 @@ export function ChatPanel() {
   const [offers, setOffers] = useState<Record<string, ListingCard[]>>({});
   const [bookedHomeId, setBookedHomeId] = useState<string | null>(null);
   const [appointment, setAppointment] = useState<string | null>(null);
-  const [mode, setMode] = useState('offline');
+  const [mode, setMode] = useState<'offline' | 'openai' | 'relay' | 'offline_fallback'>(
+    initialMode,
+  );
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -120,13 +126,14 @@ export function ChatPanel() {
             <p>Same desk as SMS, email, and Instagram.</p>
           </div>
           <span className="quiet-mode" data-testid="reply-mode">
-            {mode === 'openai'
-              ? 'OpenAI'
-              : mode === 'offline_fallback'
-                ? 'Offline fallback'
-                : 'Offline'}
+            {modeLabel(mode)}
           </span>
         </header>
+        {mode === 'offline_fallback' ? (
+          <p className="fallback-note" data-testid="fallback-note">
+            The model did not answer this turn. This reply is the offline template.
+          </p>
+        ) : null}
         <div className="thread-log" data-testid="chat-log" aria-live="polite">
           {transcript.length === 0 ? (
             <p className="empty" data-testid="chat-empty">
@@ -267,6 +274,13 @@ export function ChatPanel() {
       </aside>
     </div>
   );
+}
+
+function modeLabel(mode: string): string {
+  if (mode === 'relay') return 'Llama 3.3 70B';
+  if (mode === 'openai') return 'OpenAI';
+  if (mode === 'offline_fallback') return 'Offline fallback';
+  return 'Offline';
 }
 
 function chipsFor(slots: SlotState, booked: boolean): { label: string; text: string }[] {
