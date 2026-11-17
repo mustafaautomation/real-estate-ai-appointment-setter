@@ -20,12 +20,14 @@ export type StoredDoc<T> = {
 export class RelayHttpError extends Error {
   readonly status: number;
   readonly code: string;
+  readonly path: string;
 
-  constructor(status: number, code: string) {
+  constructor(status: number, code: string, path = '') {
     super(code);
     this.name = 'RelayHttpError';
     this.status = status;
     this.code = code;
+    this.path = path;
   }
 }
 
@@ -92,7 +94,7 @@ export class RelayClient {
       },
     });
     if (typeof payload.content !== 'string' || payload.content.trim().length === 0) {
-      throw new RelayHttpError(502, 'bad_model_payload');
+      throw new RelayHttpError(502, 'bad_model_payload', '/v1/chat');
     }
     return {
       content: payload.content,
@@ -114,8 +116,13 @@ export class RelayClient {
     const response = await this.send(`/v1/store/${collection}/${storeId(id)}`, { method: 'GET' });
     if (response.status === 404) return null;
     const payload: unknown = await readJson(response);
-    if (!response.ok)
-      throw new RelayHttpError(response.status, errorCode(payload, response.status));
+    if (!response.ok) {
+      throw new RelayHttpError(
+        response.status,
+        errorCode(payload, response.status),
+        `GET /v1/store/${collection}`,
+      );
+    }
     return unwrapData<T>(payload);
   }
 
@@ -126,7 +133,11 @@ export class RelayClient {
     if (response.status === 404) return;
     if (!response.ok) {
       const payload: unknown = await readJson(response);
-      throw new RelayHttpError(response.status, errorCode(payload, response.status));
+      throw new RelayHttpError(
+        response.status,
+        errorCode(payload, response.status),
+        `/v1/store/${collection}`,
+      );
     }
   }
 
@@ -153,7 +164,11 @@ export class RelayClient {
         next_cursor?: unknown;
       } | null;
       if (!response.ok) {
-        throw new RelayHttpError(response.status, errorCode(payload, response.status));
+        throw new RelayHttpError(
+          response.status,
+          errorCode(payload, response.status),
+          `/v1/store/${collection}`,
+        );
       }
       const body = payload ?? {};
       const items = Array.isArray(body.items) ? body.items : [];
@@ -177,15 +192,24 @@ export class RelayClient {
       throw new SlotTakenError(data.slot_key);
     }
     if (response.status !== 201 && !response.ok) {
-      throw new RelayHttpError(response.status, errorCode(payload, response.status));
+      throw new RelayHttpError(
+        response.status,
+        errorCode(payload, response.status),
+        '/v1/store/appointments',
+      );
     }
   }
 
   private async request<T>(path: string, init: { method: string; body?: unknown }): Promise<T> {
     const response = await this.send(path, init);
     const payload: unknown = await readJson(response);
-    if (!response.ok)
-      throw new RelayHttpError(response.status, errorCode(payload, response.status));
+    if (!response.ok) {
+      throw new RelayHttpError(
+        response.status,
+        errorCode(payload, response.status),
+        `${init.method} ${path}`,
+      );
+    }
     return payload as T;
   }
 
