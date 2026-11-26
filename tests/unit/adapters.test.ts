@@ -1,3 +1,7 @@
+import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+
 import { describe, expect, it, vi } from 'vitest';
 
 import { CalComCalendar } from '@/adapters/calendar/calcom';
@@ -220,6 +224,18 @@ describe('repositories', () => {
     expect(claimSlot(other, 'slot-1')).toBe(true);
     executor.close();
     other.close();
+  });
+
+  it('creates the parent directory of a SQLite file that does not exist yet', () => {
+    const root = mkdtempSync(path.join(os.tmpdir(), 'harborline-'));
+    try {
+      const file = path.join(root, 'data', 'harborline.db');
+      const executor = new SqliteExecutor(file);
+      expect(existsSync(file)).toBe(true);
+      executor.close();
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });
 

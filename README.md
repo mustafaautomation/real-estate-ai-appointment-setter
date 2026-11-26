@@ -37,7 +37,7 @@ Calendar and storage are ports. The default calendar is in-memory, with an async
 
 ## Run locally
 
-Requires Node.js 22.
+Requires Node.js 22.13 or later (the SQLite adapter uses the built-in `node:sqlite` module, unflagged from 22.13).
 
 ```bash
 cp .env.example .env.local

@@ -4,7 +4,7 @@
   "private": true,
   "description": "Personal demo of an omnichannel qualification and appointment desk. Synthetic listings. Fictional brokerage.",
   "engines": {
-    "node": ">=22"
+    "node": ">=22.13"
   },
   "scripts": {
     "dev": "next dev",

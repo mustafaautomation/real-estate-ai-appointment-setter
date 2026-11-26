@@ -1,3 +1,5 @@
+import { mkdirSync } from 'node:fs';
+import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 
 import type { SqlExecutor } from './schema';
@@ -7,6 +9,10 @@ export class SqliteExecutor implements SqlExecutor {
   private readonly db: DatabaseSync;
 
   constructor(filename: string) {
+    // SQLite does not create missing directories, and the default path is ./data/harborline.db.
+    if (filename !== ':memory:' && !filename.startsWith('file:')) {
+      mkdirSync(path.dirname(filename), { recursive: true });
+    }
     this.db = new DatabaseSync(filename);
     this.db.exec('PRAGMA journal_mode = WAL;');
     this.db.exec(SCHEMA);

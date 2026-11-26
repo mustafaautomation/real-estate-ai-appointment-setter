@@ -46,6 +46,9 @@ export function extractBudget(text: string): Budget | undefined {
     if (pair && pair.max !== undefined && pair.max >= 50_000 && pair.max <= 50_000_000) return pair;
   }
   const single = /(\$?)\s*(\d{1,3}(?:,\d{3})+|\d+(?:\.\d+)?)(\s*)(k|m|thousand|million)?/gi;
+  // An explicit amount ($, a suffix, comma grouping, or a full figure) beats a bare
+  // "hundreds mean thousands" guess, so "move in 2027, budget 500k" reads 500k, not 2027k.
+  let fallback: Budget | undefined;
   for (const match of text.matchAll(single)) {
     const raw = match[2];
     if (!raw) continue;
@@ -54,15 +57,15 @@ export function extractBudget(text: string): Budget | undefined {
     if (amount === undefined || amount < 50_000 || amount > 50_000_000) continue;
     const index = match.index ?? 0;
     const before = text.slice(Math.max(0, index - 32), index).toLowerCase();
-    if (
-      /\b(at least|over|minimum|from)\b/.test(before) &&
-      !/\b(under|below|up to|max)\b/.test(before)
-    ) {
-      return { min: amount, currency: 'USD' };
-    }
-    return { max: amount, currency: 'USD' };
+    const budget: Budget =
+      /\b(at least|over|minimum|from)\b/.test(before) && !/\b(under|below|up to|max)\b/.test(before)
+        ? { min: amount, currency: 'USD' }
+        : { max: amount, currency: 'USD' };
+    const explicit = dollar || Boolean(match[4]) || raw.includes(',') || Number(raw) >= 10_000;
+    if (explicit) return budget;
+    fallback ??= budget;
   }
-  return undefined;
+  return fallback;
 }
 
 function hasMoneyCue(text: string): boolean {

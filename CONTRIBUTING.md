@@ -1,6 +1,6 @@
 # Contributing
 
-Node.js 22. Copy `.env.example` to `.env.local`. You do not need provider accounts.
+Node.js 22.13 or later. Copy `.env.example` to `.env.local`. You do not need provider accounts.
 
 ```bash
 npm install
