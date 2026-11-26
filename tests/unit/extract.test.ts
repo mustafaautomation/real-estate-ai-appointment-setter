@@ -40,6 +40,25 @@ describe('extractSlots', () => {
     expect(extractSlots('about 3 bedrooms').budget).toBeUndefined();
   });
 
+  it('prefers an explicit amount over an earlier bare number such as a year', () => {
+    expect(extractBudget('We want to move in 2027, budget is about 500k')).toEqual({
+      max: 500_000,
+      currency: 'USD',
+    });
+    expect(extractBudget('Built after 1990 please, under $400k')).toEqual({
+      max: 400_000,
+      currency: 'USD',
+    });
+    expect(extractBudget('1200 sq ft condo, budget 450k')).toEqual({
+      max: 450_000,
+      currency: 'USD',
+    });
+    expect(extractBudget('at least 2 baths, from $350,000')).toEqual({
+      min: 350_000,
+      currency: 'USD',
+    });
+  });
+
   it('keeps a minimum when the lead gives a floor', () => {
     expect(extractBudget('at least 400k')).toEqual({ min: 400_000, currency: 'USD' });
   });
